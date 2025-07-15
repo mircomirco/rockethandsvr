@@ -10,9 +10,9 @@
       <!-- Camera e rig -->
       <a-entity id="rig" position="0 1.6 0">
         <a-camera wasd-controls="enabled: false"></a-camera>
-        <!-- Mani razzo -->
-        <a-entity id="right-hand" laser-controls="hand: right" rocket-controls></a-entity>
-        <a-entity id="left-hand" laser-controls="hand: left" rocket-controls></a-entity>
+        <!-- Mani razzo con controlli manuali -->
+        <a-entity id="right-hand" hand-controls="hand: right" rocket-controls></a-entity>
+        <a-entity id="left-hand" hand-controls="hand: left" rocket-controls></a-entity>
       </a-entity>
 
       <!-- Piattaforme -->
@@ -23,23 +23,86 @@
       <!-- Luce ambientale -->
       <a-entity light="type: ambient; intensity: 0.5"></a-entity>
 
+      <!-- Debug info -->
+      <a-text position="0 2.5 -2" value="Premi A/X per attivare i razzi" color="white" align="center"></a-text>
+
       <!-- Script per il movimento a razzo -->
       <script>
         AFRAME.registerComponent('rocket-controls', {
+          init: function () {
+            // Inizializzazione del componente
+            this.isTriggerPressed = false;
+            this.hand = this.el;
+            this.rig = document.querySelector('#rig');
+          },
+
           tick: function () {
             const hand = this.el;
             const rig = document.querySelector('#rig');
-            const gamepad = hand.components['laser-controls'].controller;
-            if (!gamepad) return;
+            
+            // Verifica se il controller è disponibile
+            if (!hand.components['hand-controls']) return;
+            
+            const controller = hand.components['hand-controls'].controller;
+            if (!controller) return;
 
-            const triggerPressed = gamepad.buttons[0].pressed;
-            if (triggerPressed) {
+            // Debug: mostra i pulsanti premuti nella console
+            if (controller.buttons) {
+              controller.buttons.forEach((button, index) => {
+                if (button.pressed) {
+                  console.log(`Pulsante ${index} premuto sulla mano ${hand.getAttribute('hand-controls').hand}`);
+                }
+              });
+            }
+
+            // Controllo del trigger (pulsante 0) o grip (pulsante 1)
+            const triggerPressed = controller.buttons && (controller.buttons[0]?.pressed || controller.buttons[1]?.pressed);
+            
+            if (triggerPressed && !this.isTriggerPressed) {
+              this.isTriggerPressed = true;
+              console.log('Razzo attivato!');
+              
+              // Calcola direzione della spinta
               const direction = new THREE.Vector3();
               hand.object3D.getWorldDirection(direction);
-              direction.multiplyScalar(-0.05); // Spinta
+              direction.multiplyScalar(-0.1); // Spinta aumentata
+              
+              // Applica la spinta al rig
               rig.object3D.position.add(direction);
+            } else if (!triggerPressed) {
+              this.isTriggerPressed = false;
             }
           }
+        });
+
+        // Aggiungi debug per i controlli
+        AFRAME.registerComponent('debug-controls', {
+          init: function () {
+            console.log('Debug controlli attivato');
+          },
+          
+          tick: function () {
+            const controllers = document.querySelectorAll('[hand-controls]');
+            controllers.forEach(controller => {
+              const handControls = controller.components['hand-controls'];
+              if (handControls && handControls.controller) {
+                const gamepad = handControls.controller;
+                if (gamepad.buttons) {
+                  gamepad.buttons.forEach((button, index) => {
+                    if (button.pressed) {
+                      console.log(`Mano ${handControls.data.hand}: Pulsante ${index} premuto`);
+                    }
+                  });
+                }
+              }
+            });
+          }
+        });
+
+        // Aggiungi il debug alla scena
+        document.addEventListener('DOMContentLoaded', function() {
+          const scene = document.querySelector('a-scene');
+          scene.setAttribute('debug-controls', '');
         });
       </script>
 
