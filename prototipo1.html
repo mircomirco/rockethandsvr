@@ -27,7 +27,7 @@
       <a-text position="0 2.5 -2" value="Usa il joystick per attivare i razzi" color="white" align="center"></a-text>
       
       <!-- Debug visivo per i pulsanti -->
-      <a-text id="debug-text" position="0 2 -1" value="Nessun pulsante premuto" color="yellow" align="center" scale="0.8 0.8 0.8"></a-text>
+      <a-text id="debug-text" position="0 2 -1" value="Inizializzazione..." color="yellow" align="center" scale="0.8 0.8 0.8"></a-text>
 
       <!-- Script per il movimento a razzo -->
       <script>
@@ -113,10 +113,41 @@
         AFRAME.registerComponent('button-debug', {
           init: function () {
             this.debugText = document.querySelector('#debug-text');
-            this.lastButtonState = {};
+            this.frameCount = 0;
+            console.log('Debug component inizializzato');
           },
           
           tick: function () {
+            this.frameCount++;
+            
+            // Controlla ogni 60 frame (circa 1 volta al secondo)
+            if (this.frameCount % 60 === 0) {
+              this.checkControllers();
+            }
+            
+            // Controlla sempre i pulsanti
+            this.checkButtons();
+          },
+          
+          checkControllers: function() {
+            const controllers = document.querySelectorAll('[hand-controls]');
+            console.log(`Trovati ${controllers.length} controller`);
+            
+            controllers.forEach((controller, index) => {
+              const handControls = controller.components['hand-controls'];
+              console.log(`Controller ${index}:`, handControls);
+              
+              if (handControls && handControls.controller) {
+                console.log(`Controller ${index} connesso:`, handControls.controller);
+                console.log('Pulsanti disponibili:', handControls.controller.buttons?.length || 0);
+                console.log('Assi disponibili:', handControls.controller.axes?.length || 0);
+              } else {
+                console.log(`Controller ${index} non connesso`);
+              }
+            });
+          },
+          
+          checkButtons: function() {
             const controllers = document.querySelectorAll('[hand-controls]');
             let debugMessage = '';
             let buttonPressed = false;
@@ -128,13 +159,13 @@
                 const hand = handControls.data.hand;
                 
                 // Debug pulsanti
-                if (gamepad.buttons) {
+                if (gamepad.buttons && gamepad.buttons.length > 0) {
                   gamepad.buttons.forEach((button, index) => {
-                    if (button.pressed) {
+                    if (button && button.pressed) {
                       buttonPressed = true;
                       const buttonName = this.getButtonName(index);
                       debugMessage += `${hand.toUpperCase()}: ${buttonName} | `;
-                      console.log(`Pulsante ${index} (${buttonName}) premuto sulla mano ${hand}`);
+                      console.log(`PULSANTE PREMUTO: ${index} (${buttonName}) sulla mano ${hand}`);
                     }
                   });
                 }
@@ -153,11 +184,14 @@
             });
             
             // Aggiorna il testo di debug
-            if (buttonPressed || debugMessage !== '') {
-              this.debugText.setAttribute('value', debugMessage || 'Nessun pulsante premuto');
+            if (buttonPressed) {
+              this.debugText.setAttribute('value', debugMessage);
               this.debugText.setAttribute('color', 'lime');
+            } else if (debugMessage !== '') {
+              this.debugText.setAttribute('value', debugMessage);
+              this.debugText.setAttribute('color', 'cyan');
             } else {
-              this.debugText.setAttribute('value', 'Nessun pulsante premuto');
+              this.debugText.setAttribute('value', 'Nessun pulsante premuto - Controlla la console');
               this.debugText.setAttribute('color', 'yellow');
             }
           },
@@ -179,6 +213,7 @@
         document.addEventListener('DOMContentLoaded', function() {
           const scene = document.querySelector('a-scene');
           scene.setAttribute('button-debug', '');
+          console.log('Scena caricata, debug attivato');
         });
       </script>
 
