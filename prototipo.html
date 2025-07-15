@@ -1,58 +1,77 @@
 <!DOCTYPE html>
 <html>
-  <head>
-    <meta charset="utf-8">
-    <title>Meta Quest Button Tracker</title>
-    <script src="https://aframe.io/releases/1.4.2/aframe.min.js"></script>
-  </head>
-  <body>
-    <a-scene>
-      <!-- Camera -->
-      <a-entity id="cameraRig" position="0 1.6 0">
-        <a-entity camera look-controls>
-          <a-entity id="logText"
-                    text="value: Premi un pulsante sul controller; color: white; align: center"
-                    position="0 0 -2"
-                    geometry="primitive: plane; height: 0.5; width: 2"
-                    material="color: black; opacity: 0.7">
-          </a-entity>
-        </a-entity>
-      </a-entity>
+<head>
+  <meta charset="utf-8">
+  <title>Babylon.js VR Button Tracker</title>
+  <style>
+    html, body { margin: 0; padding: 0; overflow: hidden; height: 100%; }
+    canvas { width: 100%; height: 100%; display: block; }
+  </style>
+  <script src="https://cdn.babylonjs.com/babylon.js"></script>
+  <script src="https://cdn.babylonjs.com/loaders/babylonjs.loaders.min.js"></script>
+</head>
+<body>
+  <canvas id="renderCanvas"></canvas>
+  <script>
+    const canvas = document.getElementById("renderCanvas");
+    const engine = new BABYLON.Engine(canvas, true);
 
-      <!-- Sky -->
-      <a-sky color="#222"></a-sky>
+    const createScene = async function () {
+      const scene = new BABYLON.Scene(engine);
+      scene.clearColor = new BABYLON.Color3(0.1, 0.1, 0.1);
 
-      <!-- Luce -->
-      <a-entity light="type: ambient; color: #FFF"></a-entity>
-    </a-scene>
+      const camera = new BABYLON.UniversalCamera("camera", new BABYLON.Vector3(0, 1.6, -3), scene);
+      camera.setTarget(BABYLON.Vector3.Zero());
+      camera.attachControl(canvas, true);
 
-    <script>
-      AFRAME.registerComponent('button-logger', {
-        init: function () {
-          this.textEl = document.getElementById('logText');
-          this.lastPressed = {};
-        },
-        tick: function () {
-          const gamepads = navigator.getGamepads();
-          if (!gamepads) return;
+      const light = new BABYLON.HemisphericLight("light", new BABYLON.Vector3(0, 1, 0), scene);
 
-          for (let i = 0; i < gamepads.length; i++) {
-            const gp = gamepads[i];
-            if (gp && gp.buttons) {
-              for (let b = 0; b < gp.buttons.length; b++) {
-                const pressed = gp.buttons[b].pressed;
-                const key = `${i}-${b}`;
-                if (pressed && !this.lastPressed[key]) {
-                  this.textEl.setAttribute('text', 'value', `Controller ${i} - Pulsante ${b} premuto`);
-                }
-                this.lastPressed[key] = pressed;
-              }
-            }
-          }
+      // Testo 3D che mostra i pulsanti premuti
+      const textPlane = BABYLON.MeshBuilder.CreatePlane("textPlane", { width: 2, height: 0.5 }, scene);
+      textPlane.position = new BABYLON.Vector3(0, 1.6, 0);
+      const advancedTexture = BABYLON.GUI.AdvancedDynamicTexture.CreateForMesh(textPlane);
+      const textBlock = new BABYLON.GUI.TextBlock();
+      textBlock.text = "Premi un pulsante sul controller";
+      textBlock.color = "white";
+      textBlock.fontSize = 50;
+      advancedTexture.addControl(textBlock);
+
+      // WebXR Experience
+      const xr = await scene.createDefaultXRExperienceAsync({
+        uiOptions: {
+          sessionMode: "immersive-vr"
         }
       });
 
-      document.querySelector('a-scene').setAttribute('button-logger', '');
-    </script>
-  </body>
+      xr.input.onControllerAddedObservable.add(controller => {
+        controller.onMotionControllerInitObservable.add(motionController => {
+          const handedness = motionController.handedness;
+
+          motionController.components.forEach((component, key) => {
+            const button = motionController.getComponent(key);
+            if (button && button.onButtonStateChangedObservable) {
+              button.onButtonStateChangedObservable.add(() => {
+                if (button.pressed) {
+                  textBlock.text = `Premuto: ${key} (${handedness})`;
+                }
+              });
+            }
+          });
+        });
+      });
+
+      return scene;
+    };
+
+    createScene().then(scene => {
+      engine.runRenderLoop(() => {
+        scene.render();
+      });
+
+      window.addEventListener("resize", function () {
+        engine.resize();
+      });
+    });
+  </script>
+</body>
 </html>
