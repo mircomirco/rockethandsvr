@@ -1,0 +1,48 @@
+<html>
+  <head>
+    <meta charset="utf-8">
+    <title>Rocket Hands VR</title>
+    <script src="https://aframe.io/releases/1.4.2/aframe.min.js"></script>
+  </head>
+  <body style="margin: 0; background: black">
+    <a-scene background="color: #000" vr-mode-ui="enabled: true">
+
+      <!-- Camera e rig -->
+      <a-entity id="rig" position="0 1.6 0">
+        <a-camera wasd-controls="enabled: false"></a-camera>
+        <!-- Mani razzo -->
+        <a-entity id="right-hand" laser-controls="hand: right" rocket-controls></a-entity>
+        <a-entity id="left-hand" laser-controls="hand: left" rocket-controls></a-entity>
+      </a-entity>
+
+      <!-- Piattaforme -->
+      <a-box position="0 2 -5" depth="4" height="0.5" width="4" color="#888"></a-box>
+      <a-box position="3 6 -8" depth="4" height="0.5" width="4" color="#777"></a-box>
+      <a-box position="-4 10 -12" depth="4" height="0.5" width="4" color="#666"></a-box>
+
+      <!-- Luce ambientale -->
+      <a-entity light="type: ambient; intensity: 0.5"></a-entity>
+
+      <!-- Script per il movimento a razzo -->
+      <script>
+        AFRAME.registerComponent('rocket-controls', {
+          tick: function () {
+            const hand = this.el;
+            const rig = document.querySelector('#rig');
+            const gamepad = hand.components['laser-controls'].controller;
+            if (!gamepad) return;
+
+            const triggerPressed = gamepad.buttons[0].pressed;
+            if (triggerPressed) {
+              const direction = new THREE.Vector3();
+              hand.object3D.getWorldDirection(direction);
+              direction.multiplyScalar(-0.05); // Spinta
+              rig.object3D.position.add(direction);
+            }
+          }
+        });
+      </script>
+
+    </a-scene>
+  </body>
+</html>
