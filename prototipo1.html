@@ -25,6 +25,9 @@
 
       <!-- Debug info -->
       <a-text position="0 2.5 -2" value="Usa il joystick per attivare i razzi" color="white" align="center"></a-text>
+      
+      <!-- Debug visivo per i pulsanti -->
+      <a-text id="debug-text" position="0 2 -1" value="Nessun pulsante premuto" color="yellow" align="center" scale="0.8 0.8 0.8"></a-text>
 
       <!-- Script per il movimento a razzo -->
       <script>
@@ -106,18 +109,35 @@
           }
         });
 
-        // Aggiungi debug per i controlli
-        AFRAME.registerComponent('debug-controls', {
+        // Componente per debug visivo dei pulsanti
+        AFRAME.registerComponent('button-debug', {
           init: function () {
-            console.log('Debug controlli attivato');
+            this.debugText = document.querySelector('#debug-text');
+            this.lastButtonState = {};
           },
           
           tick: function () {
             const controllers = document.querySelectorAll('[hand-controls]');
+            let debugMessage = '';
+            let buttonPressed = false;
+            
             controllers.forEach(controller => {
               const handControls = controller.components['hand-controls'];
               if (handControls && handControls.controller) {
                 const gamepad = handControls.controller;
+                const hand = handControls.data.hand;
+                
+                // Debug pulsanti
+                if (gamepad.buttons) {
+                  gamepad.buttons.forEach((button, index) => {
+                    if (button.pressed) {
+                      buttonPressed = true;
+                      const buttonName = this.getButtonName(index);
+                      debugMessage += `${hand.toUpperCase()}: ${buttonName} | `;
+                      console.log(`Pulsante ${index} (${buttonName}) premuto sulla mano ${hand}`);
+                    }
+                  });
+                }
                 
                 // Debug joystick
                 if (gamepad.axes && gamepad.axes.length >= 2) {
@@ -126,18 +146,39 @@
                   const magnitude = Math.sqrt(joystickX * joystickX + joystickY * joystickY);
                   
                   if (magnitude > 0.1) {
-                    console.log(`Mano ${handControls.data.hand}: Joystick X=${joystickX.toFixed(2)}, Y=${joystickY.toFixed(2)}, Magnitudine=${magnitude.toFixed(2)}`);
+                    debugMessage += `${hand.toUpperCase()}: Joystick X=${joystickX.toFixed(2)}, Y=${joystickY.toFixed(2)} | `;
                   }
                 }
               }
             });
+            
+            // Aggiorna il testo di debug
+            if (buttonPressed || debugMessage !== '') {
+              this.debugText.setAttribute('value', debugMessage || 'Nessun pulsante premuto');
+              this.debugText.setAttribute('color', 'lime');
+            } else {
+              this.debugText.setAttribute('value', 'Nessun pulsante premuto');
+              this.debugText.setAttribute('color', 'yellow');
+            }
+          },
+          
+          getButtonName: function(index) {
+            const buttonNames = {
+              0: 'Trigger',
+              1: 'Grip',
+              2: 'A/X',
+              3: 'B/Y',
+              4: 'Thumbstick',
+              5: 'Menu'
+            };
+            return buttonNames[index] || `Pulsante ${index}`;
           }
         });
 
         // Aggiungi il debug alla scena
         document.addEventListener('DOMContentLoaded', function() {
           const scene = document.querySelector('a-scene');
-          scene.setAttribute('debug-controls', '');
+          scene.setAttribute('button-debug', '');
         });
       </script>
 
