@@ -24,16 +24,17 @@
       <a-entity light="type: ambient; intensity: 0.5"></a-entity>
 
       <!-- Debug info -->
-      <a-text position="0 2.5 -2" value="Premi A/X per attivare i razzi" color="white" align="center"></a-text>
+      <a-text position="0 2.5 -2" value="Usa il joystick per attivare i razzi" color="white" align="center"></a-text>
 
       <!-- Script per il movimento a razzo -->
       <script>
         AFRAME.registerComponent('rocket-controls', {
           init: function () {
             // Inizializzazione del componente
-            this.isTriggerPressed = false;
+            this.isRocketActive = false;
             this.hand = this.el;
             this.rig = document.querySelector('#rig');
+            this.threshold = 0.3; // Soglia minima per attivare il razzo
           },
 
           tick: function () {
@@ -46,31 +47,61 @@
             const controller = hand.components['hand-controls'].controller;
             if (!controller) return;
 
-            // Debug: mostra i pulsanti premuti nella console
-            if (controller.buttons) {
-              controller.buttons.forEach((button, index) => {
-                if (button.pressed) {
-                  console.log(`Pulsante ${index} premuto sulla mano ${hand.getAttribute('hand-controls').hand}`);
-                }
-              });
+            // Debug: mostra i valori del joystick nella console
+            if (controller.axes && controller.axes.length >= 2) {
+              const joystickX = controller.axes[0];
+              const joystickY = controller.axes[1];
+              
+              // Mostra i valori solo se il joystick è mosso
+              if (Math.abs(joystickX) > 0.1 || Math.abs(joystickY) > 0.1) {
+                console.log(`Joystick ${hand.getAttribute('hand-controls').hand}: X=${joystickX.toFixed(2)}, Y=${joystickY.toFixed(2)}`);
+              }
             }
 
-            // Controllo del trigger (pulsante 0) o grip (pulsante 1)
-            const triggerPressed = controller.buttons && (controller.buttons[0]?.pressed || controller.buttons[1]?.pressed);
+            // Controllo del joystick per attivare il razzo
+            let joystickActive = false;
+            if (controller.axes && controller.axes.length >= 2) {
+              const joystickX = controller.axes[0];
+              const joystickY = controller.axes[1];
+              
+              // Calcola la magnitudine del movimento del joystick
+              const magnitude = Math.sqrt(joystickX * joystickX + joystickY * joystickY);
+              
+              // Attiva il razzo se il joystick è spostato oltre la soglia
+              if (magnitude > this.threshold) {
+                joystickActive = true;
+                
+                if (!this.isRocketActive) {
+                  this.isRocketActive = true;
+                  console.log(`Razzo attivato con joystick ${hand.getAttribute('hand-controls').hand}!`);
+                }
+                
+                // Calcola direzione della spinta basata sul joystick
+                const direction = new THREE.Vector3();
+                hand.object3D.getWorldDirection(direction);
+                
+                // Aggiungi componente laterale basato sul joystick
+                const rightVector = new THREE.Vector3();
+                hand.object3D.getWorldDirection(rightVector);
+                rightVector.cross(direction, new THREE.Vector3(0, 1, 0)).normalize();
+                
+                // Combina direzione avanti con movimento laterale del joystick
+                direction.add(rightVector.multiplyScalar(joystickX * 0.5));
+                
+                // Aggiungi componente verticale basato sul joystick Y
+                direction.y += joystickY * 0.3;
+                
+                direction.normalize();
+                direction.multiplyScalar(-0.08 * magnitude); // Spinta proporzionale al movimento
+                
+                // Applica la spinta al rig
+                rig.object3D.position.add(direction);
+              }
+            }
             
-            if (triggerPressed && !this.isTriggerPressed) {
-              this.isTriggerPressed = true;
-              console.log('Razzo attivato!');
-              
-              // Calcola direzione della spinta
-              const direction = new THREE.Vector3();
-              hand.object3D.getWorldDirection(direction);
-              direction.multiplyScalar(-0.1); // Spinta aumentata
-              
-              // Applica la spinta al rig
-              rig.object3D.position.add(direction);
-            } else if (!triggerPressed) {
-              this.isTriggerPressed = false;
+            // Reset dello stato del razzo
+            if (!joystickActive) {
+              this.isRocketActive = false;
             }
           }
         });
@@ -87,12 +118,16 @@
               const handControls = controller.components['hand-controls'];
               if (handControls && handControls.controller) {
                 const gamepad = handControls.controller;
-                if (gamepad.buttons) {
-                  gamepad.buttons.forEach((button, index) => {
-                    if (button.pressed) {
-                      console.log(`Mano ${handControls.data.hand}: Pulsante ${index} premuto`);
-                    }
-                  });
+                
+                // Debug joystick
+                if (gamepad.axes && gamepad.axes.length >= 2) {
+                  const joystickX = gamepad.axes[0];
+                  const joystickY = gamepad.axes[1];
+                  const magnitude = Math.sqrt(joystickX * joystickX + joystickY * joystickY);
+                  
+                  if (magnitude > 0.1) {
+                    console.log(`Mano ${handControls.data.hand}: Joystick X=${joystickX.toFixed(2)}, Y=${joystickY.toFixed(2)}, Magnitudine=${magnitude.toFixed(2)}`);
+                  }
                 }
               }
             });
