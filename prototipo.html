@@ -51,6 +51,31 @@
       textBlock.textVerticalAlignment = BABYLON.GUI.Control.VERTICAL_ALIGNMENT_CENTER;
       advancedTexture.addControl(textBlock);
 
+      // Pannello di log aggiuntivo
+      const logPlane = BABYLON.MeshBuilder.CreatePlane("logPlane", { width: 4, height: 2 }, scene);
+      logPlane.position = new BABYLON.Vector3(0, 0.5, -2);
+      logPlane.rotation.y = Math.PI;
+      
+      const logTexture = BABYLON.GUI.AdvancedDynamicTexture.CreateForMesh(logPlane);
+      const logBlock = new BABYLON.GUI.TextBlock();
+      logBlock.text = "Log di debug:\n";
+      logBlock.color = "yellow";
+      logBlock.fontSize = 40;
+      logBlock.textHorizontalAlignment = BABYLON.GUI.Control.HORIZONTAL_ALIGNMENT_LEFT;
+      logBlock.textVerticalAlignment = BABYLON.GUI.Control.VERTICAL_ALIGNMENT_TOP;
+      logTexture.addControl(logBlock);
+
+      // Funzione per aggiungere log visivi
+      function addLog(message) {
+        const timestamp = new Date().toLocaleTimeString();
+        logBlock.text += `[${timestamp}] ${message}\n`;
+        // Mantieni solo le ultime 10 righe
+        const lines = logBlock.text.split('\n');
+        if (lines.length > 11) {
+          logBlock.text = lines.slice(-10).join('\n');
+        }
+      }
+
       // Configurazione WebXR ottimizzata per Quest 3
       const xr = await scene.createDefaultXRExperienceAsync({
         uiOptions: {
@@ -61,32 +86,38 @@
 
       if (!xr.baseExperience) {
         textBlock.text = "VR non supportato";
+        addLog("ERRORE: VR non supportato");
         return scene;
       }
 
       textBlock.text = "VR attivo - Premi un pulsante";
+      addLog("VR inizializzato con successo");
 
       // Gestione controller migliorata per Quest 3
       xr.input.onControllerAddedObservable.add(controller => {
-        console.log("Controller aggiunto:", controller.inputSource.handedness);
+        const handedness = controller.inputSource.handedness;
+        console.log("Controller aggiunto:", handedness);
+        addLog(`Controller ${handedness} aggiunto`);
         
         controller.onMotionControllerInitObservable.add(motionController => {
           const handedness = motionController.handedness;
           console.log("Motion controller inizializzato:", handedness);
+          addLog(`Motion controller ${handedness} inizializzato`);
 
           // Gestione componenti specifici per Quest 3
           const components = motionController.components;
           Object.keys(components).forEach(key => {
             const component = motionController.getComponent(key);
-            if (component && component.onButtonStateChangedObservable) {
-              component.onButtonStateChangedObservable.add(() => {
-                if (component.pressed) {
-                  const buttonName = getButtonDisplayName(key);
-                  textBlock.text = `Premuto: ${buttonName} (${handedness})`;
-                  console.log(`Pulsante premuto: ${key} su ${handedness}`);
-                }
-              });
-            }
+                         if (component && component.onButtonStateChangedObservable) {
+               component.onButtonStateChangedObservable.add(() => {
+                 if (component.pressed) {
+                   const buttonName = getButtonDisplayName(key);
+                   textBlock.text = `Premuto: ${buttonName} (${handedness})`;
+                   console.log(`Pulsante premuto: ${key} su ${handedness}`);
+                   addLog(`Pulsante: ${buttonName} (${handedness})`);
+                 }
+               });
+             }
           });
         });
       });
@@ -94,7 +125,9 @@
       // Gestione hand tracking se disponibile
       if (xr.input.onHandAddedObservable) {
         xr.input.onHandAddedObservable.add(hand => {
-          console.log("Hand tracking attivo:", hand.xrController.inputSource.handedness);
+          const handHandedness = hand.xrController.inputSource.handedness;
+          console.log("Hand tracking attivo:", handHandedness);
+          addLog(`Hand tracking: ${handHandedness}`);
         });
       }
 
