@@ -1,174 +1,79 @@
 <!DOCTYPE html>
 <html>
 <head>
-  <meta charset="utf-8">
-  <title>Babylon.js VR Button Tracker - Meta Quest 3</title>
+  <meta charset="UTF-8">
+  <title>Babylon VR Button Tracker</title>
   <style>
-    html, body { margin: 0; padding: 0; overflow: hidden; height: 100%; }
+    html, body { margin: 0; overflow: hidden; height: 100%; }
     canvas { width: 100%; height: 100%; display: block; }
   </style>
   <script src="https://cdn.babylonjs.com/babylon.js"></script>
-  <script src="https://cdn.babylonjs.com/loaders/babylonjs.loaders.min.js"></script>
   <script src="https://cdn.babylonjs.com/gui/babylon.gui.min.js"></script>
-  <script src="https://cdn.babylonjs.com/materialsLibrary/babylonjs.materials.min.js"></script>
 </head>
 <body>
   <canvas id="renderCanvas"></canvas>
   <script>
-    // Funzione per verificare il supporto WebXR
-    function checkWebXRSupport() {
-      if (navigator.xr) {
-        return navigator.xr.isSessionSupported('immersive-vr');
-      }
-      return false;
-    }
-
     const canvas = document.getElementById("renderCanvas");
     const engine = new BABYLON.Engine(canvas, true);
 
-    const createScene = async function () {
+    const createScene = async () => {
       const scene = new BABYLON.Scene(engine);
-      scene.clearColor = new BABYLON.Color3(0.1, 0.1, 0.1);
+      scene.clearColor = new BABYLON.Color3(0.05, 0.05, 0.05);
 
-      // Telecamera VR ottimizzata per Quest 3
-      const camera = new BABYLON.WebXRFreeCamera("camera", new BABYLON.Vector3(0, 1.6, -3), scene);
+      const camera = new BABYLON.UniversalCamera("camera", new BABYLON.Vector3(0, 1.6, -2), scene);
       camera.setTarget(BABYLON.Vector3.Zero());
 
       const light = new BABYLON.HemisphericLight("light", new BABYLON.Vector3(0, 1, 0), scene);
-      light.intensity = 0.7;
 
-      // Testo 3D migliorato per VR
-      const textPlane = BABYLON.MeshBuilder.CreatePlane("textPlane", { width: 3, height: 0.8 }, scene);
-      textPlane.position = new BABYLON.Vector3(0, 1.6, -2);
-      textPlane.rotation.y = Math.PI;
-      
-      const advancedTexture = BABYLON.GUI.AdvancedDynamicTexture.CreateForMesh(textPlane);
-      const textBlock = new BABYLON.GUI.TextBlock();
-      textBlock.text = "Inizializzazione VR...";
-      textBlock.color = "white";
-      textBlock.fontSize = 60;
-      textBlock.textHorizontalAlignment = BABYLON.GUI.Control.HORIZONTAL_ALIGNMENT_CENTER;
-      textBlock.textVerticalAlignment = BABYLON.GUI.Control.VERTICAL_ALIGNMENT_CENTER;
-      advancedTexture.addControl(textBlock);
+      // Pannello GUI davanti all’utente
+      const plane = BABYLON.MeshBuilder.CreatePlane("plane", { width: 2, height: 1 }, scene);
+      plane.position = new BABYLON.Vector3(0, 1.6, 0);
 
-      // Pannello di log aggiuntivo
-      const logPlane = BABYLON.MeshBuilder.CreatePlane("logPlane", { width: 4, height: 2 }, scene);
-      logPlane.position = new BABYLON.Vector3(0, 0.5, -2);
-      logPlane.rotation.y = Math.PI;
-      
-      const logTexture = BABYLON.GUI.AdvancedDynamicTexture.CreateForMesh(logPlane);
-      const logBlock = new BABYLON.GUI.TextBlock();
-      logBlock.text = "Log di debug:\n";
-      logBlock.color = "yellow";
-      logBlock.fontSize = 40;
-      logBlock.textHorizontalAlignment = BABYLON.GUI.Control.HORIZONTAL_ALIGNMENT_LEFT;
-      logBlock.textVerticalAlignment = BABYLON.GUI.Control.VERTICAL_ALIGNMENT_TOP;
-      logTexture.addControl(logBlock);
+      const gui = BABYLON.GUI.AdvancedDynamicTexture.CreateForMesh(plane);
+      const text = new BABYLON.GUI.TextBlock();
+      text.text = "Premi un pulsante sul controller";
+      text.color = "white";
+      text.fontSize = 40;
+      gui.addControl(text);
 
-      // Funzione per aggiungere log visivi
-      function addLog(message) {
-        const timestamp = new Date().toLocaleTimeString();
-        logBlock.text += `[${timestamp}] ${message}\n`;
-        // Mantieni solo le ultime 10 righe
-        const lines = logBlock.text.split('\n');
-        if (lines.length > 11) {
-          logBlock.text = lines.slice(-10).join('\n');
-        }
-      }
-
-      // Configurazione WebXR ottimizzata per Quest 3
+      // XR setup
       const xr = await scene.createDefaultXRExperienceAsync({
         uiOptions: {
-          sessionMode: "immersive-vr"
+          sessionMode: 'immersive-vr'
         },
-        optionalFeatures: ["hand-tracking", "layers"]
+        optionalFeatures: true
       });
 
-      if (!xr.baseExperience) {
-        textBlock.text = "VR non supportato";
-        addLog("ERRORE: VR non supportato");
-        return scene;
-      }
-
-      textBlock.text = "VR attivo - Premi un pulsante";
-      addLog("VR inizializzato con successo");
-
-      // Gestione controller migliorata per Quest 3
-      xr.input.onControllerAddedObservable.add(controller => {
-        const handedness = controller.inputSource.handedness;
-        console.log("Controller aggiunto:", handedness);
-        addLog(`Controller ${handedness} aggiunto`);
-        
-        controller.onMotionControllerInitObservable.add(motionController => {
+      // Quando un controller viene connesso
+      xr.input.onControllerAddedObservable.add((controller) => {
+        controller.onMotionControllerInitObservable.add((motionController) => {
           const handedness = motionController.handedness;
-          console.log("Motion controller inizializzato:", handedness);
-          addLog(`Motion controller ${handedness} inizializzato`);
 
-          // Gestione componenti specifici per Quest 3
-          const components = motionController.components;
-          Object.keys(components).forEach(key => {
-            const component = motionController.getComponent(key);
-                         if (component && component.onButtonStateChangedObservable) {
-               component.onButtonStateChangedObservable.add(() => {
-                 if (component.pressed) {
-                   const buttonName = getButtonDisplayName(key);
-                   textBlock.text = `Premuto: ${buttonName} (${handedness})`;
-                   console.log(`Pulsante premuto: ${key} su ${handedness}`);
-                   addLog(`Pulsante: ${buttonName} (${handedness})`);
-                 }
-               });
-             }
+          motionController.components.forEach((component, id) => {
+            const comp = motionController.getComponent(id);
+
+            if (comp && comp.onButtonStateChangedObservable) {
+              comp.onButtonStateChangedObservable.add(() => {
+                if (comp.pressed) {
+                  text.text = `Premuto: ${id} (${handedness})`;
+                }
+              });
+            }
           });
         });
       });
-
-      // Gestione hand tracking se disponibile
-      if (xr.input.onHandAddedObservable) {
-        xr.input.onHandAddedObservable.add(hand => {
-          const handHandedness = hand.xrController.inputSource.handedness;
-          console.log("Hand tracking attivo:", handHandedness);
-          addLog(`Hand tracking: ${handHandedness}`);
-        });
-      }
 
       return scene;
     };
 
-    // Funzione per tradurre i nomi dei pulsanti
-    function getButtonDisplayName(key) {
-      const buttonNames = {
-        'xr-standard-trigger': 'Trigger',
-        'xr-standard-squeeze': 'Grip',
-        'xr-standard-thumbstick': 'Thumbstick',
-        'xr-standard-thumbstick-touch': 'Thumbstick Touch',
-        'xr-standard-thumbstick-press': 'Thumbstick Press',
-        'xr-standard-button-a': 'A',
-        'xr-standard-button-b': 'B',
-        'xr-standard-button-x': 'X',
-        'xr-standard-button-y': 'Y',
-        'xr-standard-button-menu': 'Menu'
-      };
-      return buttonNames[key] || key;
-    }
+    createScene().then(scene => {
+      engine.runRenderLoop(() => {
+        scene.render();
+      });
 
-    // Inizializzazione con gestione errori
-    checkWebXRSupport().then(supported => {
-      if (supported) {
-        createScene().then(scene => {
-          engine.runRenderLoop(() => {
-            scene.render();
-          });
-
-          window.addEventListener("resize", function () {
-            engine.resize();
-          });
-        }).catch(error => {
-          console.error("Errore nella creazione della scena:", error);
-        });
-      } else {
-        console.error("WebXR non supportato");
-        document.body.innerHTML = "<h1>WebXR non supportato su questo dispositivo</h1>";
-      }
+      window.addEventListener("resize", () => {
+        engine.resize();
+      });
     });
   </script>
 </body>
