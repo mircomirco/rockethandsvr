@@ -2,55 +2,57 @@
 <html>
   <head>
     <meta charset="utf-8">
-    <title>VR Button Logger</title>
-    <meta name="description" content="Visualizza i pulsanti dei controller VR premuti">
+    <title>Meta Quest Button Tracker</title>
     <script src="https://aframe.io/releases/1.4.2/aframe.min.js"></script>
   </head>
   <body>
-    <a-scene vr-mode-ui="enabled: true">
+    <a-scene>
       <!-- Camera -->
-      <a-entity id="camera" camera look-controls position="0 1.6 0">
-        <!-- Testo che mostra i pulsanti premuti -->
-        <a-entity id="buttonLog"
-                  text="value: Premi un pulsante; color: white; align: center"
-                  position="0 0 -2"
-                  geometry="primitive: plane; height: 0.5; width: 2"
-                  material="color: black; opacity: 0.6">
+      <a-entity id="cameraRig" position="0 1.6 0">
+        <a-entity camera look-controls>
+          <a-entity id="logText"
+                    text="value: Premi un pulsante sul controller; color: white; align: center"
+                    position="0 0 -2"
+                    geometry="primitive: plane; height: 0.5; width: 2"
+                    material="color: black; opacity: 0.7">
+          </a-entity>
         </a-entity>
       </a-entity>
 
-      <!-- Luce -->
-      <a-entity light="type: ambient; color: #FFF"></a-entity>
-
       <!-- Sky -->
       <a-sky color="#222"></a-sky>
+
+      <!-- Luce -->
+      <a-entity light="type: ambient; color: #FFF"></a-entity>
     </a-scene>
 
     <script>
-      AFRAME.registerComponent('log-buttons', {
+      AFRAME.registerComponent('button-logger', {
         init: function () {
-          const el = this.el;
-          const textEl = document.getElementById('buttonLog');
+          this.textEl = document.getElementById('logText');
+          this.lastPressed = {};
+        },
+        tick: function () {
+          const gamepads = navigator.getGamepads();
+          if (!gamepads) return;
 
-          el.addEventListener('buttondown', function (evt) {
-            const buttonName = evt.detail.id;
-            const hand = el.getAttribute('hand');
-            textEl.setAttribute('text', 'value', `Premuto: ${buttonName} (${hand})`);
-          });
-
-          el.addEventListener('buttonup', function () {
-            // Cancella dopo 2 secondi
-            setTimeout(() => {
-              textEl.setAttribute('text', 'value', 'Premi un pulsante');
-            }, 2000);
-          });
+          for (let i = 0; i < gamepads.length; i++) {
+            const gp = gamepads[i];
+            if (gp && gp.buttons) {
+              for (let b = 0; b < gp.buttons.length; b++) {
+                const pressed = gp.buttons[b].pressed;
+                const key = `${i}-${b}`;
+                if (pressed && !this.lastPressed[key]) {
+                  this.textEl.setAttribute('text', 'value', `Controller ${i} - Pulsante ${b} premuto`);
+                }
+                this.lastPressed[key] = pressed;
+              }
+            }
+          }
         }
       });
-    </script>
 
-    <!-- Controller destro -->
-    <a-entity hand-controls="hand: right" log-buttons></a-entity>
-    <!-- Controller sinistro -->
-    <a-entity hand-controls="hand: left" log-buttons></a-entity>
+      document.querySelector('a-scene').setAttribute('button-logger', '');
+    </script>
   </body>
 </html>
