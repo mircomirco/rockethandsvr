@@ -1,198 +1,56 @@
 <!DOCTYPE html>
-<html lang="it">
-<head>
-  <meta charset="UTF-8">
-  <title>Crea Tornado</title>
-  <style>
-    html, body {
-      margin: 0;
-      padding: 0;
-      overflow: hidden;
-      background: #20232a;
-    }
-    canvas {
-      display: block;
-    }
-  </style>
-</head>
-<body>
-    <canvas id="gameCanvas"></canvas>
-    <div id="scoreDisplay" style="
-      position: absolute;
-      top: 10px;
-      left: 10px;
-      color: white;
-      font-family: sans-serif;
-      font-size: 24px;
-      z-index: 10;
-    ">Punteggio: 0</div>
-    
+<html>
+  <head>
+    <meta charset="utf-8">
+    <title>VR Button Logger</title>
+    <meta name="description" content="Visualizza i pulsanti dei controller VR premuti">
+    <script src="https://aframe.io/releases/1.4.2/aframe.min.js"></script>
+  </head>
+  <body>
+    <a-scene vr-mode-ui="enabled: true">
+      <!-- Camera -->
+      <a-entity id="camera" camera look-controls position="0 1.6 0">
+        <!-- Testo che mostra i pulsanti premuti -->
+        <a-entity id="buttonLog"
+                  text="value: Premi un pulsante; color: white; align: center"
+                  position="0 0 -2"
+                  geometry="primitive: plane; height: 0.5; width: 2"
+                  material="color: black; opacity: 0.6">
+        </a-entity>
+      </a-entity>
+
+      <!-- Luce -->
+      <a-entity light="type: ambient; color: #FFF"></a-entity>
+
+      <!-- Sky -->
+      <a-sky color="#222"></a-sky>
+    </a-scene>
+
     <script>
-    const canvas = document.getElementById('gameCanvas');
-    const ctx = canvas.getContext('2d');
-    canvas.width = window.innerWidth;
-    canvas.height = window.innerHeight;
-    
-    let tornadoes = [];
-    let elements = [];
-    let activeTornado = null;
-    let score = 0;
-    const scoreDisplay = document.getElementById('scoreDisplay');
-    
-    class Tornado {
-      constructor(x, y) {
-        this.x = x;
-        this.y = y;
-        this.radius = 10;
-        this.maxRadius = 50;
-        this.angle = 0;
-        this.life = 100;
-        this.growing = true;
-      }
-    
-      update() {
-        if (this.growing && this.radius < this.maxRadius) {
-          this.radius += 0.5;
-        }
-        this.angle += 0.1;
-        if (!this.growing) {
-          this.life -= 1;
-        }
-      }
-    
-      draw(ctx) {
-        ctx.save();
-        ctx.translate(this.x, this.y);
-        ctx.rotate(this.angle);
-        let gradient = ctx.createRadialGradient(0, 0, 0, 0, 0, this.radius);
-        gradient.addColorStop(0, 'rgba(255,255,255,0.8)');
-        gradient.addColorStop(1, 'rgba(255,255,255,0)');
-        ctx.fillStyle = gradient;
-        ctx.beginPath();
-        ctx.arc(0, 0, this.radius, 0, Math.PI * 2);
-        ctx.fill();
-        ctx.restore();
-      }
-    
-      moveTo(x, y) {
-        this.x = x;
-        this.y = y;
-      }
-    
-      stopGrowing() {
-        this.growing = false;
-      }
-    }
-    
-    class DestructibleElement {
-      constructor(x, y) {
-        this.x = x;
-        this.y = y;
-        this.radius = 15;
-        this.color = 'lime';
-      }
-    
-      draw(ctx) {
-        ctx.fillStyle = this.color;
-        ctx.beginPath();
-        ctx.arc(this.x, this.y, this.radius, 0, Math.PI * 2);
-        ctx.fill();
-      }
-    }
-    
-    function spawnTornado(x, y) {
-      const t = new Tornado(x, y);
-      tornadoes.push(t);
-      return t;
-    }
-    
-    function spawnDestructibleElements(count = 10) {
-      for (let i = 0; i < count; i++) {
-        const x = Math.random() * canvas.width;
-        const y = Math.random() * canvas.height;
-        elements.push(new DestructibleElement(x, y));
-      }
-    }
-    
-    function updateScore() {
-      scoreDisplay.textContent = `Punteggio: ${score}`;
-    }
-    
-    function animate() {
-      ctx.clearRect(0, 0, canvas.width, canvas.height);
-    
-      // Disegna e aggiorna elementi distruttibili
-      elements.forEach(element => element.draw(ctx));
-    
-      // Aggiorna tornado e gestisci collisioni
-      tornadoes.forEach((tornado, tIndex) => {
-        tornado.update();
-        tornado.draw(ctx);
-    
-        // Controlla collisioni con elementi
-        elements = elements.filter(el => {
-          const dx = el.x - tornado.x;
-          const dy = el.y - tornado.y;
-          const dist = Math.sqrt(dx * dx + dy * dy);
-          if (dist < tornado.radius + el.radius) {
-            score += 1;
-            updateScore();
-            return false; // Rimuovi elemento
-          }
-          return true;
-        });
-    
-        if (tornado.life <= 0) {
-          tornadoes.splice(tIndex, 1);
+      AFRAME.registerComponent('log-buttons', {
+        init: function () {
+          const el = this.el;
+          const textEl = document.getElementById('buttonLog');
+
+          el.addEventListener('buttondown', function (evt) {
+            const buttonName = evt.detail.id;
+            const hand = el.getAttribute('hand');
+            textEl.setAttribute('text', 'value', `Premuto: ${buttonName} (${hand})`);
+          });
+
+          el.addEventListener('buttonup', function () {
+            // Cancella dopo 2 secondi
+            setTimeout(() => {
+              textEl.setAttribute('text', 'value', 'Premi un pulsante');
+            }, 2000);
+          });
         }
       });
-    
-      requestAnimationFrame(animate);
-    }
-    
-    // Controlli mouse
-    canvas.addEventListener('mousedown', (e) => {
-      activeTornado = spawnTornado(e.clientX, e.clientY);
-    });
-    
-    canvas.addEventListener('mousemove', (e) => {
-      if (activeTornado) {
-        activeTornado.moveTo(e.clientX, e.clientY);
-      }
-    });
-    
-    canvas.addEventListener('mouseup', () => {
-      if (activeTornado) {
-        activeTornado.stopGrowing();
-        activeTornado = null;
-      }
-    });
-    
-    // Controlli touch
-    canvas.addEventListener('touchstart', (e) => {
-      e.preventDefault();
-      const touch = e.touches[0];
-      activeTornado = spawnTornado(touch.clientX, touch.clientY);
-    }, { passive: false });
-    
-    canvas.addEventListener('touchmove', (e) => {
-      e.preventDefault();
-      const touch = e.touches[0];
-      if (activeTornado) {
-        activeTornado.moveTo(touch.clientX, touch.clientY);
-      }
-    }, { passive: false });
-    
-    canvas.addEventListener('touchend', () => {
-      if (activeTornado) {
-        activeTornado.stopGrowing();
-        activeTornado = null;
-      }
-    });
-    
-    spawnDestructibleElements(20);
-    updateScore();
-    animate();
     </script>
-    
+
+    <!-- Controller destro -->
+    <a-entity hand-controls="hand: right" log-buttons></a-entity>
+    <!-- Controller sinistro -->
+    <a-entity hand-controls="hand: left" log-buttons></a-entity>
+  </body>
 </html>
