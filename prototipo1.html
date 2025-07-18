@@ -138,7 +138,15 @@
             const x = event.detail.x;
             const y = event.detail.y;
             console.log(`Joystick ${hand}: x=${x.toFixed(2)}, y=${y.toFixed(2)}`);
-            this.handleJoystick(x, y);
+            
+            if (hand === 'left') {
+              // Joystick sinistro: movimento orizzontale della camera rig
+              this.handleJoystick(x, y);
+            } else if (hand === 'right') {
+              // Joystick destro: controllo della visuale (look controls)
+              // Questo verrà gestito automaticamente da A-Frame
+              console.log(`Joystick destro: controllo visuale - x=${x.toFixed(2)}, y=${y.toFixed(2)}`);
+            }
           });
           
           // Eventi aggiuntivi per debug
