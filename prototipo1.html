@@ -92,6 +92,14 @@
           this.maxHorizontalSpeed = 0.3;
           this.isInitialized = false;
           
+          // Rilevamento piattaforme
+          this.platforms = [
+            { y: 0.5, color: 'verde' },    // Piattaforma base
+            { y: 3.0, color: 'blu' },      // Piattaforma sinistra
+            { y: 5.5, color: 'arancione' } // Piattaforma destra
+          ];
+          this.landingThreshold = 0.3; // Distanza per atterraggio
+          
           // Particelle del razzo corrispondente
           this.rocketParticles = document.getElementById(hand === 'left' ? 'leftRocketParticles' : 'rightRocketParticles');
           
@@ -179,10 +187,24 @@
             this.horizontalVelocity.z = -y * this.maxHorizontalSpeed; // Inverti Y per movimento naturale
           };
           
+          // Funzione per rilevare piattaforme
+          this.checkPlatformLanding = (currentY) => {
+            for (let platform of this.platforms) {
+              const distance = Math.abs(currentY - platform.y);
+              if (distance <= this.landingThreshold) {
+                return platform;
+              }
+            }
+            return null;
+          };
+          
           // Funzione per applicare la fisica del volo
           this.applyPhysics = () => {
             if (this.cameraRig) {
               const currentPos = this.cameraRig.getAttribute('position');
+              
+              // Controlla se siamo su una piattaforma
+              const landingPlatform = this.checkPlatformLanding(currentPos.y);
               
               // Movimento verticale
               if (this.rocketActive) {
@@ -197,9 +219,18 @@
               }
               
               // Calcola nuova posizione
-              const newY = currentPos.y + this.verticalVelocity;
+              let newY = currentPos.y + this.verticalVelocity;
               const newX = currentPos.x + this.horizontalVelocity.x;
               const newZ = currentPos.z + this.horizontalVelocity.z;
+              
+              // Se siamo vicini a una piattaforma e stiamo scendendo, atterra
+              if (landingPlatform && this.verticalVelocity <= 0) {
+                newY = landingPlatform.y;
+                this.verticalVelocity = 0;
+                this.horizontalVelocity = { x: 0, z: 0 };
+                rocketStatus.setAttribute('value', `Atterrato su piattaforma ${landingPlatform.color}`);
+                rocketStatus.setAttribute('color', '#9C27B0');
+              }
               
               // Impedisce di andare sotto il livello del terreno
               const finalY = Math.max(0.5, newY);
@@ -218,7 +249,10 @@
               }
               
               // Aggiorna debug
-              const status = this.rocketActive ? 'SALITA' : this.isFloating ? 'FLUTTUAZIONE' : 'GRAVITÀ';
+              let status = this.rocketActive ? 'SALITA' : this.isFloating ? 'FLUTTUAZIONE' : 'GRAVITÀ';
+              if (landingPlatform && this.verticalVelocity <= 0) {
+                status = `PIATTAFORMA ${landingPlatform.color.toUpperCase()}`;
+              }
               debugInfo.setAttribute('value', `Debug: Y: ${finalY.toFixed(2)} | Vel: ${this.verticalVelocity.toFixed(2)} | ${status}`);
             }
             
