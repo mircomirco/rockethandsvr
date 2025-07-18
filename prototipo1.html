@@ -92,6 +92,9 @@
           this.maxHorizontalSpeed = 0.3;
           this.isInitialized = false;
           
+          // Stato joystick destro
+          this.rightJoystickPressed = false;
+          
           // Rilevamento piattaforme
           this.platforms = [
             { y: 0.5, color: 'verde' },    // Piattaforma base
@@ -143,9 +146,25 @@
               // Joystick sinistro: movimento orizzontale della camera rig
               this.handleJoystick(x, y);
             } else if (hand === 'right') {
-              // Joystick destro: controllo della visuale (look controls)
-              // Questo verrà gestito automaticamente da A-Frame
-              console.log(`Joystick destro: controllo visuale - x=${x.toFixed(2)}, y=${y.toFixed(2)}`);
+              // Joystick destro: controllo della visuale basato sulla direzione
+              this.handleLookControls(x, y);
+            }
+          });
+          
+          // Eventi per pressione joystick destro
+          el.addEventListener('thumbstickdown', (event) => {
+            if (hand === 'right') {
+              this.rightJoystickPressed = true;
+              console.log('Joystick destro premuto - controllo visuale attivo');
+              debugInfo.setAttribute('value', 'Debug: Controllo visuale ATTIVO');
+            }
+          });
+          
+          el.addEventListener('thumbstickup', (event) => {
+            if (hand === 'right') {
+              this.rightJoystickPressed = false;
+              console.log('Joystick destro rilasciato - controllo visuale disattivo');
+              debugInfo.setAttribute('value', 'Debug: Controllo visuale DISATTIVO');
             }
           });
           
@@ -193,6 +212,22 @@
             // Applica movimento orizzontale basato su joystick
             this.horizontalVelocity.x = x * this.maxHorizontalSpeed;
             this.horizontalVelocity.z = -y * this.maxHorizontalSpeed; // Inverti Y per movimento naturale
+          };
+          
+          // Funzione per gestire il controllo della visuale
+          this.handleLookControls = (x, y) => {
+            if (this.cameraRig && this.rightJoystickPressed) {
+              // Rotazione orizzontale (sinistra/destra)
+              this.cameraRig.object3D.rotation.y -= x * 0.05;
+              
+              // Rotazione verticale (su/giù) con limiti
+              const currentXRotation = this.cameraRig.object3D.rotation.x;
+              const newXRotation = currentXRotation - y * 0.05;
+              // Limita la rotazione verticale per evitare capovolgimenti
+              this.cameraRig.object3D.rotation.x = Math.max(-1.0, Math.min(1.0, newXRotation));
+              
+              console.log(`Rotazione visuale: Y=${this.cameraRig.object3D.rotation.y.toFixed(2)}, X=${this.cameraRig.object3D.rotation.x.toFixed(2)}`);
+            }
           };
           
           // Funzione per rilevare piattaforme
