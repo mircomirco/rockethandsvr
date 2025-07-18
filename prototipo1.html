@@ -84,11 +84,12 @@
           
           // Fisica del volo
           this.rocketActive = false;
-          this.thrustForce = 0.15;
-          this.gravity = -0.08;
+          this.isFloating = false;
           this.verticalVelocity = 0;
-          this.maxVelocity = 2.0;
-          this.damping = 0.98; // Resistenza dell'aria
+          this.horizontalVelocity = { x: 0, z: 0 };
+          this.gravity = -0.1;
+          this.constantThrust = 0.2;
+          this.maxHorizontalSpeed = 0.3;
           this.isInitialized = false;
           
           // Particelle del razzo corrispondente
@@ -112,6 +113,26 @@
             this.deactivateRocket();
           });
           
+          // Eventi per touch (fluttuazione)
+          el.addEventListener(targetButton + 'touchstart', (event) => {
+            console.log(`${targetButton} toccato su ${hand}`);
+            debugInfo.setAttribute('value', `Debug: ${targetButton} toccato - FLUTTUAZIONE`);
+            this.startFloating();
+          });
+          
+          el.addEventListener(targetButton + 'touchend', (event) => {
+            console.log(`${targetButton} touch rilasciato su ${hand}`);
+            this.stopFloating();
+          });
+          
+          // Eventi per joystick
+          el.addEventListener('thumbstickmoved', (event) => {
+            const x = event.detail.x;
+            const y = event.detail.y;
+            console.log(`Joystick ${hand}: x=${x.toFixed(2)}, y=${y.toFixed(2)}`);
+            this.handleJoystick(x, y);
+          });
+          
           // Eventi aggiuntivi per debug
           el.addEventListener('controllerconnected', () => {
             console.log(`Controller ${hand} connesso`);
@@ -119,20 +140,43 @@
             this.isInitialized = true;
           });
           
-          // Funzione per attivare il razzo
+          // Funzione per attivare il razzo (movimento costante verso l'alto)
           this.activateRocket = () => {
             this.rocketActive = true;
+            this.isFloating = false;
             this.rocketParticles.setAttribute('visible', true);
             rocketStatus.setAttribute('value', `Razzi: ATTIVI (${hand.toUpperCase()})`);
             rocketStatus.setAttribute('color', '#4CAF50');
           };
           
-          // Funzione per disattivare il razzo
+          // Funzione per disattivare il razzo (gravità)
           this.deactivateRocket = () => {
             this.rocketActive = false;
+            this.isFloating = false;
             this.rocketParticles.setAttribute('visible', false);
-            rocketStatus.setAttribute('value', 'Razzi: SPENTI');
+            rocketStatus.setAttribute('value', 'Razzi: SPENTI - GRAVITÀ');
             rocketStatus.setAttribute('color', '#FF6B6B');
+          };
+          
+          // Funzione per iniziare fluttuazione
+          this.startFloating = () => {
+            this.isFloating = true;
+            this.rocketActive = false;
+            this.verticalVelocity = 0;
+            rocketStatus.setAttribute('value', 'FLUTTUAZIONE ATTIVA');
+            rocketStatus.setAttribute('color', '#FFD700');
+          };
+          
+          // Funzione per fermare fluttuazione
+          this.stopFloating = () => {
+            this.isFloating = false;
+          };
+          
+          // Funzione per gestire joystick
+          this.handleJoystick = (x, y) => {
+            // Applica movimento orizzontale basato su joystick
+            this.horizontalVelocity.x = x * this.maxHorizontalSpeed;
+            this.horizontalVelocity.z = -y * this.maxHorizontalSpeed; // Inverti Y per movimento naturale
           };
           
           // Funzione per applicare la fisica del volo
@@ -140,40 +184,42 @@
             if (this.cameraRig) {
               const currentPos = this.cameraRig.getAttribute('position');
               
-              // Applica spinta se il razzo è attivo 
+              // Movimento verticale
               if (this.rocketActive) {
-                this.verticalVelocity += this.thrustForce;
+                // Movimento costante verso l'alto
+                this.verticalVelocity = this.constantThrust;
+              } else if (this.isFloating) {
+                // Fluttuazione - velocità zero
+                this.verticalVelocity = 0;
+              } else {
+                // Gravità quando non attivo
+                this.verticalVelocity += this.gravity;
               }
-              
-              // Applica gravità
-              this.verticalVelocity += this.gravity;
-              
-              // Limita la velocità massima
-              this.verticalVelocity = Math.max(-this.maxVelocity, Math.min(this.maxVelocity, this.verticalVelocity));
-              
-              // Applica resistenza dell'aria
-              this.verticalVelocity *= this.damping;
               
               // Calcola nuova posizione
               const newY = currentPos.y + this.verticalVelocity;
+              const newX = currentPos.x + this.horizontalVelocity.x;
+              const newZ = currentPos.z + this.horizontalVelocity.z;
               
               // Impedisce di andare sotto il livello del terreno
               const finalY = Math.max(0.5, newY);
               
               // Aggiorna posizione
               this.cameraRig.setAttribute('position', {
-                x: currentPos.x, 
+                x: newX, 
                 y: finalY, 
-                z: currentPos.z
+                z: newZ
               });
-              
-              // Aggiorna debug
-              debugInfo.setAttribute('value', `Debug: Y: ${finalY.toFixed(2)} | Vel: ${this.verticalVelocity.toFixed(2)}`);
               
               // Reset velocità se tocchi il terreno
               if (finalY <= 0.5) {
                 this.verticalVelocity = 0;
+                this.horizontalVelocity = { x: 0, z: 0 };
               }
+              
+              // Aggiorna debug
+              const status = this.rocketActive ? 'SALITA' : this.isFloating ? 'FLUTTUAZIONE' : 'GRAVITÀ';
+              debugInfo.setAttribute('value', `Debug: Y: ${finalY.toFixed(2)} | Vel: ${this.verticalVelocity.toFixed(2)} | ${status}`);
             }
             
             // Continua il loop di fisica
