@@ -17,14 +17,18 @@
       <!-- Debug info -->
       <a-text id="debugInfo" value="Debug: Inizializzazione..." position="0 3 -1" align="center" color="#FFFF00" scale="1 1 1"></a-text>
 
-      <!-- Controller sinistro -->
-      <a-entity id="leftCtl"
-                meta-touch-controls="hand: left"
-                rocket-controller="hand: left"></a-entity>
-      <!-- Controller destro -->
-      <a-entity id="rightCtl"
-                meta-touch-controls="hand: right"
-                rocket-controller="hand: right"></a-entity>
+      <!-- CAMERA RIG: contiene camera e controller -->
+      <a-entity id="cameraRig" position="0 1.6 0">
+        <a-entity camera look-controls wasd-controls></a-entity>
+        <!-- Controller sinistro -->
+        <a-entity id="leftCtl"
+                  meta-touch-controls="hand: left"
+                  rocket-controller="hand: left"></a-entity>
+        <!-- Controller destro -->
+        <a-entity id="rightCtl"
+                  meta-touch-controls="hand: right"
+                  rocket-controller="hand: right"></a-entity>
+      </a-entity>
 
       <!-- Piattaforma di partenza (base) -->
       <a-box position="0 0.5 0" 
@@ -75,6 +79,8 @@
           const hand = this.data.hand;
           const debugInfo = document.getElementById('debugInfo');
           const rocketStatus = document.getElementById('rocketStatus');
+          // Ottenere il camera rig
+          this.cameraRig = document.getElementById('cameraRig');
           
           // Stato dei razzi
           this.rocketActive = false;
@@ -115,8 +121,7 @@
             this.rocketParticles.setAttribute('visible', true);
             rocketStatus.setAttribute('value', `Razzi: ATTIVI (${hand.toUpperCase()})`);
             rocketStatus.setAttribute('color', '#4CAF50');
-            
-            // Applica forza verso l'alto alla camera
+            // Applica forza verso l'alto al camera rig
             this.applyThrust();
           };
           
@@ -131,15 +136,12 @@
           // Funzione per applicare la spinta
           this.applyThrust = () => {
             if (this.rocketActive) {
-              const camera = document.querySelector('[camera]');
-              if (camera) {
-                const currentPos = camera.getAttribute('position');
+              if (this.cameraRig) {
+                const currentPos = this.cameraRig.getAttribute('position');
                 const newY = currentPos.y + this.thrustForce;
-                camera.setAttribute('position', {x: currentPos.x, y: newY, z: currentPos.z});
-                
+                this.cameraRig.setAttribute('position', {x: currentPos.x, y: newY, z: currentPos.z});
                 debugInfo.setAttribute('value', `Debug: Volo attivo - Y: ${newY.toFixed(2)}`);
               }
-              
               // Continua ad applicare la spinta finché il razzo è attivo
               if (this.rocketActive) {
                 setTimeout(() => this.applyThrust(), 50);
@@ -150,16 +152,14 @@
           // Aggiorna la posizione delle particelle del razzo
           this.tick = () => {
             if (this.rocketActive) {
-              const camera = document.querySelector('[camera]');
-              if (camera) {
-                const cameraPos = camera.getAttribute('position');
+              if (this.cameraRig) {
+                const rigPos = this.cameraRig.getAttribute('position');
                 const handPos = el.getAttribute('position');
-                
-                // Posiziona le particelle vicino alla mano del controller
+                // Posiziona le particelle vicino alla mano del controller (approssimato)
                 this.rocketParticles.setAttribute('position', {
-                  x: handPos.x,
-                  y: handPos.y - 0.2,
-                  z: handPos.z
+                  x: rigPos.x + handPos.x,
+                  y: rigPos.y + handPos.y - 0.2,
+                  z: rigPos.z + handPos.z
                 });
               }
             }
