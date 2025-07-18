@@ -1,46 +1,83 @@
-<!DOCTYPE html>
-<html lang="it">
+<html>
   <head>
-    <meta charset="UTF-8" />
-    <title>Button Debug Quest 3S</title>
-    <script src="https://aframe.io/releases/1.7.0/aframe.min.js"></script>
+    <meta charset="utf-8" />
+    <title>Rocket Puzzle Climb VR</title>
+    <script src="https://aframe.io/releases/1.4.2/aframe.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/aframe-extras@6.1.1/dist/aframe-extras.controls.min.js"></script>
   </head>
   <body>
-    <a-scene vr-mode-ui="enabled: true">
-      <!-- Testo UI per mostrare il bottone premuto -->
-      <a-text id="btnLabel" value="Premi un bottone" position="0 2 -1" align="center" color="#FFF"></a-text>
+    <a-scene vr-mode-ui="enabled: true" joystick-controls="enabled: true">
+      <!-- Sky and lighting -->
+      <a-sky color="#000"></a-sky>
+      <a-entity light="type: ambient; color: #ccc"></a-entity>
 
-      <!-- Controller sinistro -->
-      <a-entity id="leftCtl"
-                meta-touch-controls="hand: left"
-                button-listener></a-entity>
-      <!-- Controller destro -->
-      <a-entity id="rightCtl"
-                meta-touch-controls="hand: right"
-                button-listener></a-entity>
+      <!-- Camera rig (player) -->
+      <a-entity id="rig" position="0 1.6 0">
+        <a-entity id="camera" camera look-controls wasd-controls="enabled: false"></a-entity>
+        <!-- Hands -->
+        <a-entity hand-controls="hand: left"></a-entity>
+        <a-entity hand-controls="hand: right"></a-entity>
+      </a-entity>
 
-      <!-- Un piano semplice sotto di noi -->
-      <a-plane rotation="-90 0 0" width="10" height="10" color="#444"></a-plane>
+      <!-- Piattaforme (esempio 5 piattaforme alternate) -->
+      <a-box position="-2 3 -5" width="4" height="0.5" depth="4" color="#666"></a-box>
+      <a-box position="2 6 -5" width="4" height="0.5" depth="4" color="#666"></a-box>
+      <a-box position="-2 9 -5" width="4" height="0.5" depth="4" color="#666"></a-box>
+      <a-box position="2 12 -5" width="4" height="0.5" depth="4" color="#666"></a-box>
+      <a-box position="-2 15 -5" width="4" height="0.5" depth="4" color="#666"></a-box>
+
+      <!-- Ground fallback -->
+      <a-box position="0 -1 -5" width="100" height="0.1" depth="100" color="#111"></a-box>
     </a-scene>
 
     <script>
-      AFRAME.registerComponent('button-listener', {
+      AFRAME.registerComponent('rocket-controls', {
+        schema: {},
         init: function () {
-          const el = this.el;
-          const lbl = document.getElementById('btnLabel');
-          const buttons = [
-            'trigger', 'grip', 'thumbstick', 'abutton', 'bbutton',
-            'xbutton', 'ybutton', 'surface'
-          ];
-          buttons.forEach(btn => {
-            ['down','up','touchstart','touchend'].forEach(evtType => {
-              const evtName = btn + evtType;
-              el.addEventListener(evtName, e => {
-                lbl.setAttribute('value', `${evtName} su ${el.getAttribute('meta-touch-controls').hand}`);
-              });
-            });
+          this.rig = document.getElementById('rig');
+          this.velocity = 0;
+          this.gravity = -0.02;
+          this.upForce = 0.05;
+
+          this.fly = false;
+          window.addEventListener('gamepadbuttondown', (e) => {
+            if (e.detail.index === 4 || e.detail.index === 5) { // A o X
+              this.fly = true;
+            }
           });
+          window.addEventListener('gamepadbuttonup', (e) => {
+            if (e.detail.index === 4 || e.detail.index === 5) {
+              this.fly = false;
+            }
+          });
+        },
+        tick: function () {
+          let pos = this.rig.object3D.position;
+          if (this.fly) {
+            this.velocity = this.upForce;
+          } else {
+            this.velocity += this.gravity;
+          }
+
+          // Collisione piattaforme (semplificata)
+          if (pos.y <= 0.5) {
+            this.velocity = 0;
+            pos.y = 0.5;
+          }
+
+          pos.y += this.velocity;
+
+          // Thumbstick per movimento laterale (può essere espanso)
+          let gamepads = navigator.getGamepads();
+          if (gamepads[0]) {
+            let axisX = gamepads[0].axes[2]; // sinistro orizzontale
+            pos.x += axisX * 0.05;
+          }
         }
+      });
+
+      document.querySelector('a-scene').addEventListener('loaded', () => {
+        document.getElementById('rig').setAttribute('rocket-controls', '');
       });
     </script>
   </body>
