@@ -82,9 +82,13 @@
           // Ottenere il camera rig
           this.cameraRig = document.getElementById('cameraRig');
           
-          // Stato dei razzi
+          // Fisica del volo
           this.rocketActive = false;
-          this.thrustForce = 0.1;
+          this.thrustForce = 0.15;
+          this.gravity = -0.08;
+          this.verticalVelocity = 0;
+          this.maxVelocity = 2.0;
+          this.damping = 0.98; // Resistenza dell'aria
           this.isInitialized = false;
           
           // Particelle del razzo corrispondente
@@ -121,8 +125,6 @@
             this.rocketParticles.setAttribute('visible', true);
             rocketStatus.setAttribute('value', `Razzi: ATTIVI (${hand.toUpperCase()})`);
             rocketStatus.setAttribute('color', '#4CAF50');
-            // Applica forza verso l'alto al camera rig
-            this.applyThrust();
           };
           
           // Funzione per disattivare il razzo
@@ -133,21 +135,53 @@
             rocketStatus.setAttribute('color', '#FF6B6B');
           };
           
-          // Funzione per applicare la spinta
-          this.applyThrust = () => {
-            if (this.rocketActive) {
-              if (this.cameraRig) {
-                const currentPos = this.cameraRig.getAttribute('position');
-                const newY = currentPos.y + this.thrustForce;
-                this.cameraRig.setAttribute('position', {x: currentPos.x, y: newY, z: currentPos.z});
-                debugInfo.setAttribute('value', `Debug: Volo attivo - Y: ${newY.toFixed(2)}`);
-              }
-              // Continua ad applicare la spinta finché il razzo è attivo
+          // Funzione per applicare la fisica del volo
+          this.applyPhysics = () => {
+            if (this.cameraRig) {
+              const currentPos = this.cameraRig.getAttribute('position');
+              
+              // Applica spinta se il razzo è attivo
               if (this.rocketActive) {
-                setTimeout(() => this.applyThrust(), 50);
+                this.verticalVelocity += this.thrustForce;
+              }
+              
+              // Applica gravità
+              this.verticalVelocity += this.gravity;
+              
+              // Limita la velocità massima
+              this.verticalVelocity = Math.max(-this.maxVelocity, Math.min(this.maxVelocity, this.verticalVelocity));
+              
+              // Applica resistenza dell'aria
+              this.verticalVelocity *= this.damping;
+              
+              // Calcola nuova posizione
+              const newY = currentPos.y + this.verticalVelocity;
+              
+              // Impedisce di andare sotto il livello del terreno
+              const finalY = Math.max(0.5, newY);
+              
+              // Aggiorna posizione
+              this.cameraRig.setAttribute('position', {
+                x: currentPos.x, 
+                y: finalY, 
+                z: currentPos.z
+              });
+              
+              // Aggiorna debug
+              debugInfo.setAttribute('value', `Debug: Y: ${finalY.toFixed(2)} | Vel: ${this.verticalVelocity.toFixed(2)}`);
+              
+              // Reset velocità se tocchi il terreno
+              if (finalY <= 0.5) {
+                this.verticalVelocity = 0;
               }
             }
+            
+            // Continua il loop di fisica
+            setTimeout(() => this.applyPhysics(), 50);
           };
+          
+          // Avvia il loop di fisica
+          this.applyPhysics();
           
           // Aggiorna la posizione delle particelle del razzo
           this.tick = () => {
