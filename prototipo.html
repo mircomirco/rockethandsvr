@@ -1,84 +1,306 @@
-<html>
-  <head>
-    <meta charset="utf-8" />
-    <title>Rocket Puzzle Climb VR</title>
-    <script src="https://aframe.io/releases/1.4.2/aframe.min.js"></script>
-    <script src="https://cdn.jsdelivr.net/npm/aframe-extras@6.1.1/dist/aframe-extras.controls.min.js"></script>
-  </head>
-  <body>
-    <a-scene vr-mode-ui="enabled: true" joystick-controls="enabled: true">
-      <!-- Sky and lighting -->
-      <a-sky color="#000"></a-sky>
-      <a-entity light="type: ambient; color: #ccc"></a-entity>
+<!DOCTYPE html>
+<html lang="it">
+<head>
+    <meta charset="UTF-8">
+    <title>Rocket Flight VR - Meta Quest 3</title>
+    <script src="https://aframe.io/releases/1.7.0/aframe.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/gh/n5ro/aframe-physics-system@v4.0.1/dist/aframe-physics-system.min.js"></script>
+    <style>
+        body { margin: 0; padding: 0; overflow: hidden; }
+        .ui-overlay {
+            position: fixed;
+            top: 20px;
+            left: 20px;
+            color: white;
+            font-family: Arial, sans-serif;
+            z-index: 1000;
+            background: rgba(0,0,0,0.7);
+            padding: 15px;
+            border-radius: 10px;
+        }
+        .status {
+            margin: 5px 0;
+            padding: 5px;
+            border-radius: 5px;
+        }
+        .status.active { background: #4CAF50; }
+        .status.inactive { background: #f44336; }
+        .status.floating { background: #FFD700; }
+    </style>
+</head>
+<body>
+    <a-scene vr-mode-ui="enabled: true" physics="gravity: -9.8">
+        <!-- Camera Rig con controller -->
+        <a-entity id="cameraRig" position="0 1.6 0">
+            <a-entity camera look-controls></a-entity>
+            
+            <!-- Controller sinistro -->
+            <a-entity id="leftController"
+                      meta-touch-controls="hand: left"
+                      rocket-controller="hand: left"></a-entity>
+            
+            <!-- Controller destro -->
+            <a-entity id="rightController"
+                      meta-touch-controls="hand: right"
+                      rocket-controller="hand: right"></a-entity>
+        </a-entity>
 
-      <!-- Camera rig (player) -->
-      <a-entity id="rig" position="0 1.6 0">
-        <a-entity id="camera" camera look-controls wasd-controls="enabled: false"></a-entity>
-        <!-- Hands -->
-        <a-entity hand-controls="hand: left"></a-entity>
-        <a-entity hand-controls="hand: right"></a-entity>
-      </a-entity>
+        <!-- Particelle razzo sinistro -->
+        <a-entity id="leftRocketParticles" position="0 0 0" visible="false">
+            <a-sphere position="0 0 0" radius="0.05" color="#FF4444" 
+                      animation="property: scale; to: 3 3 3; dur: 200; easing: easeOutQuad; loop: true"></a-sphere>
+            <a-sphere position="0 0.1 0" radius="0.03" color="#FF6666" 
+                      animation="property: scale; to: 2 2 2; dur: 150; easing: easeOutQuad; loop: true"></a-sphere>
+            <a-sphere position="0 0.2 0" radius="0.02" color="#FF8888" 
+                      animation="property: scale; to: 1.5 1.5 1.5; dur: 100; easing: easeOutQuad; loop: true"></a-sphere>
+        </a-entity>
 
-      <!-- Piattaforme (esempio 5 piattaforme alternate) -->
-      <a-box position="-2 3 -5" width="4" height="0.5" depth="4" color="#666"></a-box>
-      <a-box position="2 6 -5" width="4" height="0.5" depth="4" color="#666"></a-box>
-      <a-box position="-2 9 -5" width="4" height="0.5" depth="4" color="#666"></a-box>
-      <a-box position="2 12 -5" width="4" height="0.5" depth="4" color="#666"></a-box>
-      <a-box position="-2 15 -5" width="4" height="0.5" depth="4" color="#666"></a-box>
+        <!-- Particelle razzo destro -->
+        <a-entity id="rightRocketParticles" position="0 0 0" visible="false">
+            <a-sphere position="0 0 0" radius="0.05" color="#FF4444" 
+                      animation="property: scale; to: 3 3 3; dur: 200; easing: easeOutQuad; loop: true"></a-sphere>
+            <a-sphere position="0 0.1 0" radius="0.03" color="#FF6666" 
+                      animation="property: scale; to: 2 2 2; dur: 150; easing: easeOutQuad; loop: true"></a-sphere>
+            <a-sphere position="0 0.2 0" radius="0.02" color="#FF8888" 
+                      animation="property: scale; to: 1.5 1.5 1.5; dur: 100; easing: easeOutQuad; loop: true"></a-sphere>
+        </a-entity>
 
-      <!-- Ground fallback -->
-      <a-box position="0 -1 -5" width="100" height="0.1" depth="100" color="#111"></a-box>
+        <!-- Terreno -->
+        <a-plane rotation="-90 0 0" width="50" height="50" color="#4CAF50" position="0 0 0"></a-plane>
+
+        <!-- Piattaforme di atterraggio -->
+        <a-box position="0 2 0" width="8" height="1" depth="8" color="#2196F3" static-body></a-box>
+        <a-box position="-10 4 0" width="6" height="1" depth="6" color="#FF9800" static-body></a-box>
+        <a-box position="10 6 0" width="6" height="1" depth="6" color="#9C27B0" static-body></a-box>
+
+        <!-- Luci -->
+        <a-light type="ambient" color="#404040"></a-light>
+        <a-light type="directional" position="0 10 5" color="#FFFFFF" intensity="0.8"></a-light>
+
+        <!-- Cielo -->
+        <a-sky color="#87CEEB"></a-sky>
     </a-scene>
 
+    <!-- UI Overlay -->
+    <div class="ui-overlay">
+        <h3>🚀 Rocket Flight VR</h3>
+        <div id="status" class="status inactive">Razzi: SPENTI</div>
+        <div id="position">Posizione: Y: 1.60</div>
+        <div id="velocity">Velocità: 0.00</div>
+        <div id="instructions">
+            <strong>Controlli:</strong><br>
+            • Tasto A: Attiva razzi<br>
+            • Thumbstick sinistro: Movimento laterale<br>
+            • Touch A: Fluttuazione
+        </div>
+    </div>
+
     <script>
-      AFRAME.registerComponent('rocket-controls', {
-        schema: {},
-        init: function () {
-          this.rig = document.getElementById('rig');
-          this.velocity = 0;
-          this.gravity = -0.02;
-          this.upForce = 0.05;
-
-          this.fly = false;
-          window.addEventListener('gamepadbuttondown', (e) => {
-            if (e.detail.index === 4 || e.detail.index === 5) { // A o X
-              this.fly = true;
+        // Componente principale per il sistema di volo
+        AFRAME.registerComponent('rocket-controller', {
+            schema: {
+                hand: {type: 'string', default: 'right'}
+            },
+            
+            init: function () {
+                const el = this.el;
+                const hand = this.data.hand;
+                
+                // Riferimenti globali
+                this.cameraRig = document.getElementById('cameraRig');
+                this.statusElement = document.getElementById('status');
+                this.positionElement = document.getElementById('position');
+                this.velocityElement = document.getElementById('velocity');
+                
+                // Particelle del razzo
+                this.rocketParticles = document.getElementById(hand === 'left' ? 'leftRocketParticles' : 'rightRocketParticles');
+                
+                // Fisica del volo
+                this.rocketActive = false;
+                this.isFloating = false;
+                this.verticalVelocity = 0;
+                this.horizontalVelocity = 0;
+                this.gravity = -0.15;
+                this.thrustForce = 0.25;
+                this.maxHorizontalSpeed = 0.4;
+                
+                // Piattaforme di atterraggio
+                this.platforms = [
+                    { y: 0.5, color: 'verde' },
+                    { y: 2.5, color: 'blu' },
+                    { y: 4.5, color: 'arancione' },
+                    { y: 6.5, color: 'viola' }
+                ];
+                this.landingThreshold = 0.5;
+                
+                // Eventi controller
+                this.setupControllerEvents();
+                
+                // Avvia loop di fisica
+                this.startPhysicsLoop();
+            },
+            
+            setupControllerEvents: function() {
+                const el = this.el;
+                const hand = this.data.hand;
+                
+                // Evento per tasto A (entrambi i controller)
+                el.addEventListener('abuttondown', () => {
+                    console.log(`Tasto A premuto su ${hand}`);
+                    this.activateRocket();
+                });
+                
+                el.addEventListener('abuttonup', () => {
+                    console.log(`Tasto A rilasciato su ${hand}`);
+                    this.deactivateRocket();
+                });
+                
+                // Evento per touch (fluttuazione)
+                el.addEventListener('abuttontouchstart', () => {
+                    console.log(`Touch A su ${hand} - Fluttuazione`);
+                    this.startFloating();
+                });
+                
+                el.addEventListener('abuttontouchend', () => {
+                    this.stopFloating();
+                });
+                
+                // Evento per thumbstick sinistro (solo controller sinistro)
+                if (hand === 'left') {
+                    el.addEventListener('thumbstickmoved', (event) => {
+                        const x = event.detail.x;
+                        this.handleHorizontalMovement(x);
+                    });
+                }
+            },
+            
+            activateRocket: function() {
+                this.rocketActive = true;
+                this.isFloating = false;
+                this.rocketParticles.setAttribute('visible', true);
+                this.updateStatus('Razzi: ATTIVI', 'active');
+            },
+            
+            deactivateRocket: function() {
+                this.rocketActive = false;
+                this.isFloating = false;
+                this.rocketParticles.setAttribute('visible', false);
+                this.updateStatus('Razzi: SPENTI', 'inactive');
+            },
+            
+            startFloating: function() {
+                this.isFloating = true;
+                this.rocketActive = false;
+                this.verticalVelocity = 0;
+                this.updateStatus('FLUTTUAZIONE', 'floating');
+            },
+            
+            stopFloating: function() {
+                this.isFloating = false;
+            },
+            
+            handleHorizontalMovement: function(x) {
+                // Movimento laterale con thumbstick sinistro
+                this.horizontalVelocity = x * this.maxHorizontalSpeed;
+            },
+            
+            checkPlatformLanding: function(currentY) {
+                for (let platform of this.platforms) {
+                    const distance = Math.abs(currentY - platform.y);
+                    if (distance <= this.landingThreshold) {
+                        return platform;
+                    }
+                }
+                return null;
+            },
+            
+            updateStatus: function(text, className) {
+                this.statusElement.textContent = text;
+                this.statusElement.className = `status ${className}`;
+            },
+            
+            updateUI: function(position, velocity) {
+                this.positionElement.textContent = `Posizione: Y: ${position.y.toFixed(2)}`;
+                this.velocityElement.textContent = `Velocità: ${velocity.toFixed(2)}`;
+            },
+            
+            applyPhysics: function() {
+                if (this.cameraRig) {
+                    const currentPos = this.cameraRig.getAttribute('position');
+                    
+                    // Controlla atterraggio su piattaforma
+                    const landingPlatform = this.checkPlatformLanding(currentPos.y);
+                    
+                    // Fisica verticale
+                    if (this.rocketActive) {
+                        this.verticalVelocity = this.thrustForce; // Salita costante
+                    } else if (this.isFloating) {
+                        this.verticalVelocity = 0; // Fluttuazione
+                    } else {
+                        this.verticalVelocity += this.gravity; // Gravità
+                    }
+                    
+                    // Calcola nuova posizione
+                    let newY = currentPos.y + this.verticalVelocity;
+                    let newX = currentPos.x + this.horizontalVelocity;
+                    
+                    // Atterraggio automatico
+                    if (landingPlatform && this.verticalVelocity <= 0) {
+                        newY = landingPlatform.y;
+                        this.verticalVelocity = 0;
+                        this.horizontalVelocity = 0;
+                        this.updateStatus(`Atterrato su piattaforma ${landingPlatform.color}`, 'inactive');
+                    }
+                    
+                    // Limite terreno
+                    const finalY = Math.max(0.5, newY);
+                    
+                    // Aggiorna posizione camera rig
+                    this.cameraRig.setAttribute('position', {
+                        x: newX,
+                        y: finalY,
+                        z: currentPos.z
+                    });
+                    
+                    // Reset velocità se tocchi il terreno
+                    if (finalY <= 0.5) {
+                        this.verticalVelocity = 0;
+                        this.horizontalVelocity = 0;
+                    }
+                    
+                    // Aggiorna UI
+                    this.updateUI({y: finalY}, this.verticalVelocity);
+                    
+                    // Aggiorna posizione particelle
+                    this.updateParticlePosition();
+                }
+                
+                // Continua loop
+                setTimeout(() => this.applyPhysics(), 50);
+            },
+            
+            updateParticlePosition: function() {
+                if (this.rocketActive && this.cameraRig) {
+                    const rigPos = this.cameraRig.getAttribute('position');
+                    const handPos = this.el.getAttribute('position');
+                    
+                    this.rocketParticles.setAttribute('position', {
+                        x: rigPos.x + handPos.x,
+                        y: rigPos.y + handPos.y - 0.3,
+                        z: rigPos.z + handPos.z
+                    });
+                }
+            },
+            
+            startPhysicsLoop: function() {
+                this.applyPhysics();
             }
-          });
-          window.addEventListener('gamepadbuttonup', (e) => {
-            if (e.detail.index === 4 || e.detail.index === 5) {
-              this.fly = false;
-            }
-          });
-        },
-        tick: function () {
-          let pos = this.rig.object3D.position;
-          if (this.fly) {
-            this.velocity = this.upForce;
-          } else {
-            this.velocity += this.gravity;
-          }
+        });
 
-          // Collisione piattaforme (semplificata)
-          if (pos.y <= 0.5) {
-            this.velocity = 0;
-            pos.y = 0.5;
-          }
-
-          pos.y += this.velocity;
-
-          // Thumbstick per movimento laterale (può essere espanso)
-          let gamepads = navigator.getGamepads();
-          if (gamepads[0]) {
-            let axisX = gamepads[0].axes[2]; // sinistro orizzontale
-            pos.x += axisX * 0.05;
-          }
-        }
-      });
-
-      document.querySelector('a-scene').addEventListener('loaded', () => {
-        document.getElementById('rig').setAttribute('rocket-controls', '');
-      });
+        // Debug globale
+        document.addEventListener('DOMContentLoaded', () => {
+            console.log('Rocket Flight VR - Sistema inizializzato');
+        });
     </script>
-  </body>
-</html>
+</body>
+</html> 
