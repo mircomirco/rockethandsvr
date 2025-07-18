@@ -1,0 +1,387 @@
+<!DOCTYPE html>
+<html lang="it">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Rocket Flight VR - Meta Quest 3</title>
+    <script src="https://aframe.io/releases/1.7.0/aframe.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/gh/n5ro/aframe-physics-system@v4.0.1/dist/aframe-physics-system.min.js"></script>
+    <style>
+        body { 
+            margin: 0; 
+            padding: 0; 
+            overflow: hidden; 
+            background: #000;
+        }
+        .ui-overlay {
+            position: fixed;
+            top: 20px;
+            left: 20px;
+            color: white;
+            font-family: 'Segoe UI', Arial, sans-serif;
+            z-index: 1000;
+            background: rgba(0,0,0,0.8);
+            padding: 20px;
+            border-radius: 15px;
+            border: 2px solid #667eea;
+            min-width: 300px;
+        }
+        .status {
+            margin: 8px 0;
+            padding: 10px;
+            border-radius: 8px;
+            font-weight: bold;
+            text-align: center;
+        }
+        .status.active { background: #4CAF50; }
+        .status.inactive { background: #f44336; }
+        .status.floating { background: #FFD700; color: #000; }
+        .status.landed { background: #9C27B0; }
+        .info {
+            margin: 5px 0;
+            font-size: 14px;
+        }
+        .instructions {
+            margin-top: 15px;
+            padding: 10px;
+            background: rgba(102, 126, 234, 0.2);
+            border-radius: 8px;
+            border-left: 4px solid #667eea;
+        }
+    </style>
+</head>
+<body>
+    <a-scene vr-mode-ui="enabled: true" 
+             physics="gravity: -9.8; debug: false"
+             renderer="antialias: true; colorManagement: true; sortObjects: true; 
+                      highRefreshRate: true; foveationLevel: 1">
+        
+        <!-- Camera Rig ottimizzato per Quest 3 -->
+        <a-entity id="cameraRig" position="0 1.6 0">
+            <a-entity camera look-controls="reverseMouseDrag: false; 
+                                          pointerLockEnabled: false; 
+                                          touchEnabled: false"></a-entity>
+            
+            <!-- Controller sinistro -->
+            <a-entity id="leftController"
+                      meta-touch-controls="hand: left; 
+                                          model: false; 
+                                          controllerModel: false;
+                                          hapticActuators: trigger, thumbstick"
+                      rocket-controller="hand: left"></a-entity>
+            
+            <!-- Controller destro -->
+            <a-entity id="rightController"
+                      meta-touch-controls="hand: right; 
+                                          model: false; 
+                                          controllerModel: false;
+                                          hapticActuators: trigger, thumbstick"
+                      rocket-controller="hand: right"></a-entity>
+        </a-entity>
+
+        <!-- Particelle razzo sinistro -->
+        <a-entity id="leftRocketParticles" position="0 0 0" visible="false">
+            <a-sphere position="0 0 0" radius="0.08" color="#FF4444" 
+                      animation="property: scale; to: 2.5 2.5 2.5; dur: 300; easing: easeOutQuad; loop: true"></a-sphere>
+            <a-sphere position="0 0.15 0" radius="0.05" color="#FF6666" 
+                      animation="property: scale; to: 2 2 2; dur: 250; easing: easeOutQuad; loop: true"></a-sphere>
+            <a-sphere position="0 0.3 0" radius="0.03" color="#FF8888" 
+                      animation="property: scale; to: 1.5 1.5 1.5; dur: 200; easing: easeOutQuad; loop: true"></a-sphere>
+        </a-entity>
+
+        <!-- Particelle razzo destro -->
+        <a-entity id="rightRocketParticles" position="0 0 0" visible="false">
+            <a-sphere position="0 0 0" radius="0.08" color="#FF4444" 
+                      animation="property: scale; to: 2.5 2.5 2.5; dur: 300; easing: easeOutQuad; loop: true"></a-sphere>
+            <a-sphere position="0 0.15 0" radius="0.05" color="#FF6666" 
+                      animation="property: scale; to: 2 2 2; dur: 250; easing: easeOutQuad; loop: true"></a-sphere>
+            <a-sphere position="0 0.3 0" radius="0.03" color="#FF8888" 
+                      animation="property: scale; to: 1.5 1.5 1.5; dur: 200; easing: easeOutQuad; loop: true"></a-sphere>
+        </a-entity>
+
+        <!-- Terreno -->
+        <a-plane rotation="-90 0 0" width="100" height="100" color="#4CAF50" position="0 0 0"></a-plane>
+
+        <!-- Piattaforme di atterraggio -->
+        <a-box position="0 2 0" width="10" height="1" depth="10" color="#2196F3" static-body></a-box>
+        <a-box position="-15 4 0" width="8" height="1" depth="8" color="#FF9800" static-body></a-box>
+        <a-box position="15 6 0" width="8" height="1" depth="8" color="#9C27B0" static-body></a-box>
+        <a-box position="0 8 0" width="6" height="1" depth="6" color="#E91E63" static-body></a-box>
+
+        <!-- Luci ottimizzate per Quest 3 -->
+        <a-light type="ambient" color="#404040" intensity="0.6"></a-light>
+        <a-light type="directional" position="0 20 10" color="#FFFFFF" intensity="1.0" cast-shadow="true"></a-light>
+        <a-light type="point" position="0 10 0" color="#87CEEB" intensity="0.5"></a-light>
+
+        <!-- Cielo -->
+        <a-sky color="#87CEEB"></a-sky>
+
+        <!-- Fog per profondità -->
+        <a-entity fog="type: exponential; color: #87CEEB; density: 0.01"></a-entity>
+    </a-scene>
+
+    <!-- UI Overlay ottimizzato per Quest 3 -->
+    <div class="ui-overlay">
+        <h3 style="margin: 0 0 15px 0; color: #667eea;">🚀 Rocket Flight VR</h3>
+        <div id="status" class="status inactive">Razzi: SPENTI</div>
+        <div id="position" class="info">Posizione: Y: 1.60</div>
+        <div id="velocity" class="info">Velocità: 0.00</div>
+        <div id="platform" class="info">Piattaforma: Nessuna</div>
+        <div class="instructions">
+            <strong>Controlli Quest 3:</strong><br>
+            • <strong>Tasto A:</strong> Attiva razzi (salita)<br>
+            • <strong>Thumbstick sinistro:</strong> Movimento laterale<br>
+            • <strong>Touch A:</strong> Fluttuazione<br>
+            • <strong>Rilascio A:</strong> Gravità (discesa)
+        </div>
+    </div>
+
+    <script>
+        // Componente ottimizzato per Meta Quest 3
+        AFRAME.registerComponent('rocket-controller', {
+            schema: {
+                hand: {type: 'string', default: 'right'}
+            },
+            
+            init: function () {
+                const el = this.el;
+                const hand = this.data.hand;
+                
+                // Riferimenti UI
+                this.cameraRig = document.getElementById('cameraRig');
+                this.statusElement = document.getElementById('status');
+                this.positionElement = document.getElementById('position');
+                this.velocityElement = document.getElementById('velocity');
+                this.platformElement = document.getElementById('platform');
+                
+                // Particelle del razzo
+                this.rocketParticles = document.getElementById(hand === 'left' ? 'leftRocketParticles' : 'rightRocketParticles');
+                
+                // Fisica ottimizzata per Quest 3
+                this.rocketActive = false;
+                this.isFloating = false;
+                this.verticalVelocity = 0;
+                this.horizontalVelocity = 0;
+                this.gravity = -0.12; // Gravità più realistica
+                this.thrustForce = 0.20; // Spinta bilanciata
+                this.maxHorizontalSpeed = 0.35; // Movimento fluido
+                
+                // Haptic feedback per Quest 3
+                this.hapticIntensity = 0.5;
+                
+                // Piattaforme con posizioni precise
+                this.platforms = [
+                    { y: 0.5, color: 'verde', name: 'Terreno' },
+                    { y: 2.5, color: 'blu', name: 'Piattaforma Blu' },
+                    { y: 4.5, color: 'arancione', name: 'Piattaforma Arancione' },
+                    { y: 6.5, color: 'viola', name: 'Piattaforma Viola' },
+                    { y: 8.5, color: 'rosa', name: 'Piattaforma Rosa' }
+                ];
+                this.landingThreshold = 0.6;
+                
+                // Setup eventi controller
+                this.setupControllerEvents();
+                
+                // Avvia loop di fisica
+                this.startPhysicsLoop();
+                
+                console.log(`Controller ${hand} inizializzato per Quest 3`);
+            },
+            
+            setupControllerEvents: function() {
+                const el = this.el;
+                const hand = this.data.hand;
+                
+                // Eventi per tasto A (entrambi i controller)
+                el.addEventListener('abuttondown', () => {
+                    console.log(`Tasto A premuto su ${hand}`);
+                    this.activateRocket();
+                });
+                
+                el.addEventListener('abuttonup', () => {
+                    console.log(`Tasto A rilasciato su ${hand}`);
+                    this.deactivateRocket();
+                });
+                
+                // Eventi per touch (fluttuazione)
+                el.addEventListener('abuttontouchstart', () => {
+                    console.log(`Touch A su ${hand} - Fluttuazione`);
+                    this.startFloating();
+                });
+                
+                el.addEventListener('abuttontouchend', () => {
+                    this.stopFloating();
+                });
+                
+                // Evento per thumbstick sinistro (solo controller sinistro)
+                if (hand === 'left') {
+                    el.addEventListener('thumbstickmoved', (event) => {
+                        const x = event.detail.x;
+                        this.handleHorizontalMovement(x);
+                    });
+                }
+                
+                // Eventi di connessione controller
+                el.addEventListener('controllerconnected', () => {
+                    console.log(`Controller ${hand} connesso al Quest 3`);
+                });
+            },
+            
+            activateRocket: function() {
+                this.rocketActive = true;
+                this.isFloating = false;
+                this.rocketParticles.setAttribute('visible', true);
+                this.updateStatus('Razzi: ATTIVI', 'active');
+                
+                // Haptic feedback per Quest 3
+                if (this.el.components['meta-touch-controls']) {
+                    this.el.components['meta-touch-controls'].pulse(this.hapticIntensity, 100);
+                }
+            },
+            
+            deactivateRocket: function() {
+                this.rocketActive = false;
+                this.isFloating = false;
+                this.rocketParticles.setAttribute('visible', false);
+                this.updateStatus('Razzi: SPENTI', 'inactive');
+            },
+            
+            startFloating: function() {
+                this.isFloating = true;
+                this.rocketActive = false;
+                this.verticalVelocity = 0;
+                this.updateStatus('FLUTTUAZIONE', 'floating');
+            },
+            
+            stopFloating: function() {
+                this.isFloating = false;
+            },
+            
+            handleHorizontalMovement: function(x) {
+                // Movimento laterale con thumbstick sinistro
+                this.horizontalVelocity = x * this.maxHorizontalSpeed;
+            },
+            
+            checkPlatformLanding: function(currentY) {
+                for (let platform of this.platforms) {
+                    const distance = Math.abs(currentY - platform.y);
+                    if (distance <= this.landingThreshold) {
+                        return platform;
+                    }
+                }
+                return null;
+            },
+            
+            updateStatus: function(text, className) {
+                this.statusElement.textContent = text;
+                this.statusElement.className = `status ${className}`;
+            },
+            
+            updateUI: function(position, velocity, platform) {
+                this.positionElement.textContent = `Posizione: Y: ${position.y.toFixed(2)}`;
+                this.velocityElement.textContent = `Velocità: ${velocity.toFixed(2)}`;
+                this.platformElement.textContent = `Piattaforma: ${platform ? platform.name : 'Nessuna'}`;
+            },
+            
+            applyPhysics: function() {
+                if (this.cameraRig) {
+                    const currentPos = this.cameraRig.getAttribute('position');
+                    
+                    // Controlla atterraggio su piattaforma
+                    const landingPlatform = this.checkPlatformLanding(currentPos.y);
+                    
+                    // Fisica verticale
+                    if (this.rocketActive) {
+                        this.verticalVelocity = this.thrustForce; // Salita costante
+                    } else if (this.isFloating) {
+                        this.verticalVelocity = 0; // Fluttuazione
+                    } else {
+                        this.verticalVelocity += this.gravity; // Gravità
+                    }
+                    
+                    // Calcola nuova posizione
+                    let newY = currentPos.y + this.verticalVelocity;
+                    let newX = currentPos.x + this.horizontalVelocity;
+                    
+                    // Atterraggio automatico
+                    if (landingPlatform && this.verticalVelocity <= 0) {
+                        newY = landingPlatform.y;
+                        this.verticalVelocity = 0;
+                        this.horizontalVelocity = 0;
+                        this.updateStatus(`Atterrato su ${landingPlatform.name}`, 'landed');
+                    }
+                    
+                    // Limite terreno
+                    const finalY = Math.max(0.5, newY);
+                    
+                    // Aggiorna posizione camera rig
+                    this.cameraRig.setAttribute('position', {
+                        x: newX,
+                        y: finalY,
+                        z: currentPos.z
+                    });
+                    
+                    // Reset velocità se tocchi il terreno
+                    if (finalY <= 0.5) {
+                        this.verticalVelocity = 0;
+                        this.horizontalVelocity = 0;
+                    }
+                    
+                    // Aggiorna UI
+                    this.updateUI({y: finalY}, this.verticalVelocity, landingPlatform);
+                    
+                    // Aggiorna posizione particelle
+                    this.updateParticlePosition();
+                }
+                
+                // Continua loop ottimizzato per Quest 3
+                setTimeout(() => this.applyPhysics(), 60); // 60fps per Quest 3
+            },
+            
+            updateParticlePosition: function() {
+                if (this.rocketActive && this.cameraRig) {
+                    const rigPos = this.cameraRig.getAttribute('position');
+                    const handPos = this.el.getAttribute('position');
+                    
+                    this.rocketParticles.setAttribute('position', {
+                        x: rigPos.x + handPos.x,
+                        y: rigPos.y + handPos.y - 0.4,
+                        z: rigPos.z + handPos.z
+                    });
+                }
+            },
+            
+            startPhysicsLoop: function() {
+                this.applyPhysics();
+            }
+        });
+
+        // Inizializzazione globale per Quest 3
+        document.addEventListener('DOMContentLoaded', () => {
+            console.log('Rocket Flight VR - Ottimizzato per Meta Quest 3');
+            
+            // Verifica supporto WebXR
+            if (navigator.xr) {
+                navigator.xr.isSessionSupported('immersive-vr').then(supported => {
+                    if (supported) {
+                        console.log('WebXR supportato - Ready per Quest 3');
+                        
+                        // Configurazioni specifiche per Quest 3
+                        if (navigator.userAgent.includes('Quest')) {
+                            console.log('Dispositivo Quest rilevato - Applicando ottimizzazioni');
+                        }
+                    } else {
+                        console.log('WebXR non supportato su questo dispositivo');
+                    }
+                });
+            }
+            
+            // Ottimizzazioni per performance Quest 3
+            if (window.AFRAME) {
+                AFRAME.scenes[0].renderer.setPixelRatio(1.0); // Ottimizza per Quest 3
+                AFRAME.scenes[0].renderer.setSize(window.innerWidth, window.innerHeight);
+            }
+        });
+    </script>
+</body>
+</html> 
