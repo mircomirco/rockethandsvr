@@ -1,222 +1,165 @@
-<html>
+<!DOCTYPE html>
+<html lang="it">
   <head>
-    <meta charset="utf-8">
-    <title>Rocket Hands VR</title>
-    <script src="https://aframe.io/releases/1.4.2/aframe.min.js"></script>
+    <meta charset="UTF-8" />
+    <title>Rocket Hands VR - Piattaforme e Volo</title>
+    <script src="https://aframe.io/releases/1.7.0/aframe.min.js"></script>
   </head>
-  <body style="margin: 0; background: black">
-    <a-scene background="color: #000" vr-mode-ui="enabled: true">
+  <body>
+    <a-scene vr-mode-ui="enabled: true" physics="gravity: -9.8">
+      <!-- Testo UI per mostrare il bottone premuto -->
+      <a-text id="btnLabel" value="Usa A e X per volare!" position="0 4 -1" align="center" color="#FFF" scale="2 2 2"></a-text>
 
-      <!-- Camera e rig -->
-      <a-entity id="rig" position="0 1.6 0">
-        <a-camera wasd-controls="enabled: false"></a-camera>
-        <!-- Mani razzo con controlli manuali -->
-        <a-entity id="right-hand" hand-controls="hand: right" rocket-controls></a-entity>
-        <a-entity id="left-hand" hand-controls="hand: left" rocket-controls></a-entity>
+      <!-- Testo per lo stato dei razzi -->
+      <a-text id="rocketStatus" value="Razzi: SPENTI" position="0 3.5 -1" align="center" color="#FF6B6B" scale="1.5 1.5 1.5"></a-text>
+
+      <!-- Controller sinistro -->
+      <a-entity id="leftCtl"
+                meta-touch-controls="hand: left"
+                rocket-controller="hand: left"></a-entity>
+      <!-- Controller destro -->
+      <a-entity id="rightCtl"
+                meta-touch-controls="hand: right"
+                rocket-controller="hand: right"></a-entity>
+
+      <!-- Piattaforma di partenza (base) -->
+      <a-box position="0 0.5 0" 
+             width="8" height="1" depth="8" 
+             color="#4CAF50" 
+             static-body></a-box>
+
+      <!-- Piattaforma sinistra (livello medio) -->
+      <a-box position="-6 3 0" 
+             width="6" height="1" depth="6" 
+             color="#2196F3" 
+             static-body></a-box>
+
+      <!-- Piattaforma destra (livello alto) -->
+      <a-box position="6 5.5 0" 
+             width="6" height="1" depth="6" 
+             color="#FF9800" 
+             static-body></a-box>
+
+      <!-- Particelle per i razzi -->
+      <a-entity id="leftRocketParticles" position="0 0 0" visible="false">
+        <a-sphere position="0 0 0" radius="0.1" color="#FF4444" animation="property: scale; to: 2 2 2; dur: 200; easing: easeOutQuad; loop: true"></a-sphere>
+        <a-sphere position="0 0.2 0" radius="0.05" color="#FF6666" animation="property: scale; to: 1.5 1.5 1.5; dur: 150; easing: easeOutQuad; loop: true"></a-sphere>
       </a-entity>
 
-      <!-- Piattaforme -->
-      <a-box position="0 2 -5" depth="4" height="0.5" width="4" color="#888"></a-box>
-      <a-box position="3 6 -8" depth="4" height="0.5" width="4" color="#777"></a-box>
-      <a-box position="-4 10 -12" depth="4" height="0.5" width="4" color="#666"></a-box>
+      <a-entity id="rightRocketParticles" position="0 0 0" visible="false">
+        <a-sphere position="0 0 0" radius="0.1" color="#FF4444" animation="property: scale; to: 2 2 2; dur: 200; easing: easeOutQuad; loop: true"></a-sphere>
+        <a-sphere position="0 0.2 0" radius="0.05" color="#FF6666" animation="property: scale; to: 1.5 1.5 1.5; dur: 150; easing: easeOutQuad; loop: true"></a-sphere>
+      </a-entity>
 
-      <!-- Luce ambientale -->
-      <a-entity light="type: ambient; intensity: 0.5"></a-entity>
+      <!-- Luci per illuminare le piattaforme -->
+      <a-light type="ambient" color="#404040"></a-light>
+      <a-light type="directional" position="0 10 5" color="#FFFFFF" intensity="0.8"></a-light>
 
-      <!-- Debug info -->
-      <a-text position="0 2.5 -2" value="Usa il joystick per attivare i razzi" color="white" align="center"></a-text>
-      
-      <!-- Debug visivo per i pulsanti -->
-      <a-text id="debug-text" position="0 2 -1" value="Inizializzazione..." color="yellow" align="center" scale="0.8 0.8 0.8"></a-text>
-
-      <!-- Script per il movimento a razzo -->
-      <script>
-        AFRAME.registerComponent('rocket-controls', {
-          init: function () {
-            // Inizializzazione del componente
-            this.isRocketActive = false;
-            this.hand = this.el;
-            this.rig = document.querySelector('#rig');
-            this.threshold = 0.3; // Soglia minima per attivare il razzo
-          },
-
-          tick: function () {
-            const hand = this.el;
-            const rig = document.querySelector('#rig');
-            
-            // Verifica se il controller è disponibile
-            if (!hand.components['hand-controls']) return;
-            
-            const controller = hand.components['hand-controls'].controller;
-            if (!controller) return;
-
-            // Debug: mostra i valori del joystick nella console
-            if (controller.axes && controller.axes.length >= 2) {
-              const joystickX = controller.axes[0];
-              const joystickY = controller.axes[1];
-              
-              // Mostra i valori solo se il joystick è mosso
-              if (Math.abs(joystickX) > 0.1 || Math.abs(joystickY) > 0.1) {
-                console.log(`Joystick ${hand.getAttribute('hand-controls').hand}: X=${joystickX.toFixed(2)}, Y=${joystickY.toFixed(2)}`);
-              }
-            }
-
-            // Controllo del joystick per attivare il razzo
-            let joystickActive = false;
-            if (controller.axes && controller.axes.length >= 2) {
-              const joystickX = controller.axes[0];
-              const joystickY = controller.axes[1];
-              
-              // Calcola la magnitudine del movimento del joystick
-              const magnitude = Math.sqrt(joystickX * joystickX + joystickY * joystickY);
-              
-              // Attiva il razzo se il joystick è spostato oltre la soglia
-              if (magnitude > this.threshold) {
-                joystickActive = true;
-                
-                if (!this.isRocketActive) {
-                  this.isRocketActive = true;
-                  console.log(`Razzo attivato con joystick ${hand.getAttribute('hand-controls').hand}!`);
-                }
-                
-                // Calcola direzione della spinta basata sul joystick
-                const direction = new THREE.Vector3();
-                hand.object3D.getWorldDirection(direction);
-                
-                // Aggiungi componente laterale basato sul joystick
-                const rightVector = new THREE.Vector3();
-                hand.object3D.getWorldDirection(rightVector);
-                rightVector.cross(direction, new THREE.Vector3(0, 1, 0)).normalize();
-                
-                // Combina direzione avanti con movimento laterale del joystick
-                direction.add(rightVector.multiplyScalar(joystickX * 0.5));
-                
-                // Aggiungi componente verticale basato sul joystick Y
-                direction.y += joystickY * 0.3;
-                
-                direction.normalize();
-                direction.multiplyScalar(-0.08 * magnitude); // Spinta proporzionale al movimento
-                
-                // Applica la spinta al rig
-                rig.object3D.position.add(direction);
-              }
-            }
-            
-            // Reset dello stato del razzo
-            if (!joystickActive) {
-              this.isRocketActive = false;
-            }
-          }
-        });
-
-        // Componente per debug visivo dei pulsanti
-        AFRAME.registerComponent('button-debug', {
-          init: function () {
-            this.debugText = document.querySelector('#debug-text');
-            this.frameCount = 0;
-            console.log('Debug component inizializzato');
-          },
-          
-          tick: function () {
-            this.frameCount++;
-            
-            // Controlla ogni 60 frame (circa 1 volta al secondo)
-            if (this.frameCount % 60 === 0) {
-              this.checkControllers();
-            }
-            
-            // Controlla sempre i pulsanti
-            this.checkButtons();
-          },
-          
-          checkControllers: function() {
-            const controllers = document.querySelectorAll('[hand-controls]');
-            console.log(`Trovati ${controllers.length} controller`);
-            
-            controllers.forEach((controller, index) => {
-              const handControls = controller.components['hand-controls'];
-              console.log(`Controller ${index}:`, handControls);
-              
-              if (handControls && handControls.controller) {
-                console.log(`Controller ${index} connesso:`, handControls.controller);
-                console.log('Pulsanti disponibili:', handControls.controller.buttons?.length || 0);
-                console.log('Assi disponibili:', handControls.controller.axes?.length || 0);
-              } else {
-                console.log(`Controller ${index} non connesso`);
-              }
-            });
-          },
-          
-          checkButtons: function() {
-            const controllers = document.querySelectorAll('[hand-controls]');
-            let debugMessage = '';
-            let buttonPressed = false;
-            
-            controllers.forEach(controller => {
-              const handControls = controller.components['hand-controls'];
-              if (handControls && handControls.controller) {
-                const gamepad = handControls.controller;
-                const hand = handControls.data.hand;
-                
-                // Debug pulsanti
-                if (gamepad.buttons && gamepad.buttons.length > 0) {
-                  gamepad.buttons.forEach((button, index) => {
-                    if (button && button.pressed) {
-                      buttonPressed = true;
-                      const buttonName = this.getButtonName(index);
-                      debugMessage += `${hand.toUpperCase()}: ${buttonName} | `;
-                      console.log(`PULSANTE PREMUTO: ${index} (${buttonName}) sulla mano ${hand}`);
-                    }
-                  });
-                }
-                
-                // Debug joystick
-                if (gamepad.axes && gamepad.axes.length >= 2) {
-                  const joystickX = gamepad.axes[0];
-                  const joystickY = gamepad.axes[1];
-                  const magnitude = Math.sqrt(joystickX * joystickX + joystickY * joystickY);
-                  
-                  if (magnitude > 0.1) {
-                    debugMessage += `${hand.toUpperCase()}: Joystick X=${joystickX.toFixed(2)}, Y=${joystickY.toFixed(2)} | `;
-                  }
-                }
-              }
-            });
-            
-            // Aggiorna il testo di debug
-            if (buttonPressed) {
-              this.debugText.setAttribute('value', debugMessage);
-              this.debugText.setAttribute('color', 'lime');
-            } else if (debugMessage !== '') {
-              this.debugText.setAttribute('value', debugMessage);
-              this.debugText.setAttribute('color', 'cyan');
-            } else {
-              this.debugText.setAttribute('value', 'Nessun pulsante premuto - Controlla la console');
-              this.debugText.setAttribute('color', 'yellow');
-            }
-          },
-          
-          getButtonName: function(index) {
-            const buttonNames = {
-              0: 'Trigger',
-              1: 'Grip',
-              2: 'A/X',
-              3: 'B/Y',
-              4: 'Thumbstick',
-              5: 'Menu'
-            };
-            return buttonNames[index] || `Pulsante ${index}`;
-          }
-        });
-
-        // Aggiungi il debug alla scena
-        document.addEventListener('DOMContentLoaded', function() {
-          const scene = document.querySelector('a-scene');
-          scene.setAttribute('button-debug', '');
-          console.log('Scena caricata, debug attivato');
-        });
-      </script>
-
+      <!-- Cielo -->
+      <a-sky color="#87CEEB"></a-sky>
     </a-scene>
+
+    <script>
+      // Componente per gestire i controller e i razzi
+      AFRAME.registerComponent('rocket-controller', {
+        schema: {
+          hand: {type: 'string', default: 'right'}
+        },
+        
+        init: function () {
+          const el = this.el;
+          const hand = this.data.hand;
+          const camera = document.querySelector('[camera]');
+          const rocketStatus = document.getElementById('rocketStatus');
+          
+          // Stato dei razzi
+          this.rocketActive = false;
+          this.thrustForce = 0.3;
+          
+          // Particelle del razzo corrispondente
+          this.rocketParticles = document.getElementById(hand === 'left' ? 'leftRocketParticles' : 'rightRocketParticles');
+          
+          // Pulsanti da monitorare (A per mano destra, X per mano sinistra)
+          const targetButton = hand === 'right' ? 'abutton' : 'xbutton';
+          
+          // Eventi per attivazione/disattivazione razzi
+          el.addEventListener(targetButton + 'down', () => {
+            this.activateRocket();
+          });
+          
+          el.addEventListener(targetButton + 'up', () => {
+            this.deactivateRocket();
+          });
+          
+          // Funzione per attivare il razzo
+          this.activateRocket = () => {
+            this.rocketActive = true;
+            this.rocketParticles.setAttribute('visible', true);
+            rocketStatus.setAttribute('value', `Razzi: ATTIVI (${hand.toUpperCase()})`);
+            rocketStatus.setAttribute('color', '#4CAF50');
+            
+            // Applica forza verso l'alto alla camera
+            this.applyThrust();
+          };
+          
+          // Funzione per disattivare il razzo
+          this.deactivateRocket = () => {
+            this.rocketActive = false;
+            this.rocketParticles.setAttribute('visible', false);
+            rocketStatus.setAttribute('value', 'Razzi: SPENTI');
+            rocketStatus.setAttribute('color', '#FF6B6B');
+          };
+          
+          // Funzione per applicare la spinta
+          this.applyThrust = () => {
+            if (this.rocketActive && camera) {
+              const currentPos = camera.getAttribute('position');
+              const newY = currentPos.y + this.thrustForce;
+              camera.setAttribute('position', {x: currentPos.x, y: newY, z: currentPos.z});
+              
+              // Continua ad applicare la spinta finché il razzo è attivo
+              if (this.rocketActive) {
+                setTimeout(() => this.applyThrust(), 50);
+              }
+            }
+          };
+          
+          // Aggiorna la posizione delle particelle del razzo
+          this.tick = () => {
+            if (this.rocketActive && camera) {
+              const cameraPos = camera.getAttribute('position');
+              const handPos = el.getAttribute('position');
+              
+              // Posiziona le particelle vicino alla mano del controller
+              this.rocketParticles.setAttribute('position', {
+                x: handPos.x,
+                y: handPos.y - 0.2,
+                z: handPos.z
+              });
+            }
+          };
+        }
+      });
+
+      // Componente per il debug dei pulsanti (mantenuto per riferimento)
+      AFRAME.registerComponent('button-listener', {
+        init: function () {
+          const el = this.el;
+          const lbl = document.getElementById('btnLabel');
+          const buttons = [
+            'trigger', 'grip', 'thumbstick', 'abutton', 'bbutton',
+            'xbutton', 'ybutton', 'surface'
+          ];
+          buttons.forEach(btn => {
+            ['down','up','touchstart','touchend'].forEach(evtType => {
+              const evtName = btn + evtType;
+              el.addEventListener(evtName, e => {
+                lbl.setAttribute('value', `${evtName} su ${el.getAttribute('meta-touch-controls').hand}`);
+              });
+            });
+          });
+        }
+      });
+    </script>
   </body>
 </html>
