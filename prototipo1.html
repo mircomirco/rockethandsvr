@@ -4,14 +4,18 @@
     <meta charset="UTF-8" />
     <title>Rocket Hands VR - Piattaforme e Volo</title>
     <script src="https://aframe.io/releases/1.7.0/aframe.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/gh/n5ro/aframe-physics-system@v4.0.1/dist/aframe-physics-system.min.js"></script>
   </head>
   <body>
-    <a-scene vr-mode-ui="enabled: true" physics="gravity: -9.8">
+    <a-scene vr-mode-ui="enabled: true" physics="gravity: -9.8; debug: true">
       <!-- Testo UI per mostrare il bottone premuto -->
       <a-text id="btnLabel" value="Usa A e X per volare!" position="0 4 -1" align="center" color="#FFF" scale="2 2 2"></a-text>
 
       <!-- Testo per lo stato dei razzi -->
       <a-text id="rocketStatus" value="Razzi: SPENTI" position="0 3.5 -1" align="center" color="#FF6B6B" scale="1.5 1.5 1.5"></a-text>
+
+      <!-- Debug info -->
+      <a-text id="debugInfo" value="Debug: Inizializzazione..." position="0 3 -1" align="center" color="#FFFF00" scale="1 1 1"></a-text>
 
       <!-- Controller sinistro -->
       <a-entity id="leftCtl"
@@ -69,12 +73,13 @@
         init: function () {
           const el = this.el;
           const hand = this.data.hand;
-          const camera = document.querySelector('[camera]');
+          const debugInfo = document.getElementById('debugInfo');
           const rocketStatus = document.getElementById('rocketStatus');
           
           // Stato dei razzi
           this.rocketActive = false;
-          this.thrustForce = 0.3;
+          this.thrustForce = 0.1;
+          this.isInitialized = false;
           
           // Particelle del razzo corrispondente
           this.rocketParticles = document.getElementById(hand === 'left' ? 'leftRocketParticles' : 'rightRocketParticles');
@@ -82,13 +87,26 @@
           // Pulsanti da monitorare (A per mano destra, X per mano sinistra)
           const targetButton = hand === 'right' ? 'abutton' : 'xbutton';
           
+          debugInfo.setAttribute('value', `Debug: Controller ${hand} inizializzato`);
+          
           // Eventi per attivazione/disattivazione razzi
-          el.addEventListener(targetButton + 'down', () => {
+          el.addEventListener(targetButton + 'down', (event) => {
+            console.log(`${targetButton} premuto su ${hand}`);
+            debugInfo.setAttribute('value', `Debug: ${targetButton} premuto su ${hand}`);
             this.activateRocket();
           });
           
-          el.addEventListener(targetButton + 'up', () => {
+          el.addEventListener(targetButton + 'up', (event) => {
+            console.log(`${targetButton} rilasciato su ${hand}`);
+            debugInfo.setAttribute('value', `Debug: ${targetButton} rilasciato su ${hand}`);
             this.deactivateRocket();
+          });
+          
+          // Eventi aggiuntivi per debug
+          el.addEventListener('controllerconnected', () => {
+            console.log(`Controller ${hand} connesso`);
+            debugInfo.setAttribute('value', `Debug: Controller ${hand} connesso`);
+            this.isInitialized = true;
           });
           
           // Funzione per attivare il razzo
@@ -112,10 +130,15 @@
           
           // Funzione per applicare la spinta
           this.applyThrust = () => {
-            if (this.rocketActive && camera) {
-              const currentPos = camera.getAttribute('position');
-              const newY = currentPos.y + this.thrustForce;
-              camera.setAttribute('position', {x: currentPos.x, y: newY, z: currentPos.z});
+            if (this.rocketActive) {
+              const camera = document.querySelector('[camera]');
+              if (camera) {
+                const currentPos = camera.getAttribute('position');
+                const newY = currentPos.y + this.thrustForce;
+                camera.setAttribute('position', {x: currentPos.x, y: newY, z: currentPos.z});
+                
+                debugInfo.setAttribute('value', `Debug: Volo attivo - Y: ${newY.toFixed(2)}`);
+              }
               
               // Continua ad applicare la spinta finché il razzo è attivo
               if (this.rocketActive) {
@@ -126,16 +149,19 @@
           
           // Aggiorna la posizione delle particelle del razzo
           this.tick = () => {
-            if (this.rocketActive && camera) {
-              const cameraPos = camera.getAttribute('position');
-              const handPos = el.getAttribute('position');
-              
-              // Posiziona le particelle vicino alla mano del controller
-              this.rocketParticles.setAttribute('position', {
-                x: handPos.x,
-                y: handPos.y - 0.2,
-                z: handPos.z
-              });
+            if (this.rocketActive) {
+              const camera = document.querySelector('[camera]');
+              if (camera) {
+                const cameraPos = camera.getAttribute('position');
+                const handPos = el.getAttribute('position');
+                
+                // Posiziona le particelle vicino alla mano del controller
+                this.rocketParticles.setAttribute('position', {
+                  x: handPos.x,
+                  y: handPos.y - 0.2,
+                  z: handPos.z
+                });
+              }
             }
           };
         }
@@ -159,6 +185,13 @@
             });
           });
         }
+      });
+
+      // Debug globale per verificare che tutto funzioni
+      document.addEventListener('DOMContentLoaded', () => {
+        console.log('DOM caricato');
+        const debugInfo = document.getElementById('debugInfo');
+        debugInfo.setAttribute('value', 'Debug: DOM caricato, in attesa dei controller...');
       });
     </script>
   </body>
