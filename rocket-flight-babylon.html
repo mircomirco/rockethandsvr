@@ -111,7 +111,7 @@
             scene.clearColor = new BABYLON.Color3(0.1, 0.1, 0.1);
 
             // Camera VR ottimizzata per Quest 3
-            const camera = new BABYLON.WebXRFreeCamera("camera", new BABYLON.Vector3(0, 1.6, 0), scene);
+            const camera = new BABYLON.FreeCamera("camera", new BABYLON.Vector3(0, 1.6, 0), scene);
             camera.setTarget(BABYLON.Vector3.Zero());
 
             // Luci ottimizzate per Quest 3
@@ -231,14 +231,25 @@
             }
 
             // WebXR Experience ottimizzata per Quest 3
-            const xr = await scene.createDefaultXRExperienceAsync({
-                uiOptions: {
-                    sessionMode: "immersive-vr",
-                    referenceSpaceType: "local-floor"
-                },
-                optionalFeatures: ["hand-tracking", "layers", "dom-overlay"],
-                requiredFeatures: ["local-floor"]
-            });
+            let xr;
+            try {
+                xr = await scene.createDefaultXRExperienceAsync({
+                    uiOptions: {
+                        sessionMode: "immersive-vr",
+                        referenceSpaceType: "local-floor"
+                    },
+                    optionalFeatures: ["hand-tracking", "layers", "dom-overlay"],
+                    requiredFeatures: ["local-floor"]
+                });
+            } catch (error) {
+                console.error("Errore nella creazione WebXR:", error);
+                // Fallback con configurazione minima
+                xr = await scene.createDefaultXRExperienceAsync({
+                    uiOptions: {
+                        sessionMode: "immersive-vr"
+                    }
+                });
+            }
 
             if (!xr.baseExperience) {
                 updateStatus("VR non supportato - Verifica browser", "inactive");
@@ -352,7 +363,12 @@
 
             // Loop di fisica
             scene.registerBeforeRender(() => {
-                const currentPos = camera.position;
+                // Usa la camera XR se disponibile, altrimenti la camera normale
+                const activeCamera = xr.baseExperience && xr.baseExperience.state === BABYLON.WebXRState.IN_XR 
+                    ? xr.baseExperience.camera 
+                    : camera;
+                
+                const currentPos = activeCamera.position;
                 
                 // Controlla atterraggio su piattaforma
                 const landingPlatform = checkPlatformLanding(currentPos.y);
@@ -382,7 +398,7 @@
                 const finalY = Math.max(0.5, newY);
                 
                 // Aggiorna posizione camera
-                camera.position = new BABYLON.Vector3(newX, finalY, currentPos.z);
+                activeCamera.position = new BABYLON.Vector3(newX, finalY, currentPos.z);
                 
                 // Reset velocità se tocchi il terreno
                 if (finalY <= 0.5) {
@@ -395,8 +411,8 @@
                 
                 // Aggiorna posizione particelle
                 if (rocketActive) {
-                    leftRocketParticles.emitter = camera.position.add(new BABYLON.Vector3(-0.3, -0.5, 0));
-                    rightRocketParticles.emitter = camera.position.add(new BABYLON.Vector3(0.3, -0.5, 0));
+                    leftRocketParticles.emitter = activeCamera.position.add(new BABYLON.Vector3(-0.3, -0.5, 0));
+                    rightRocketParticles.emitter = activeCamera.position.add(new BABYLON.Vector3(0.3, -0.5, 0));
                 }
             });
 
