@@ -915,13 +915,19 @@
                 const isInVR = this.xr && this.xr.baseExperience && this.xr.baseExperience.state === BABYLON.WebXRState.IN_XR;
                 let cameraRig;
                 
-                if (isInVR && this.xr.baseExperience.camera.parent) {
+                if (isInVR && this.xr.baseExperience.camera && this.xr.baseExperience.camera.parent) {
                     // In VR: muovi il rig per mantenere il tracking posizionale
                     cameraRig = this.xr.baseExperience.camera.parent;
                 } else {
                     // Fuori VR: muovi la camera normale
                     cameraRig = this.activeCamera;
                 }
+                
+                if (!cameraRig) {
+                    console.warn("⚠️ Nessuna camera disponibile per il movimento");
+                    return;
+                }
+                
                 const currentPosition = cameraRig.position;
                 
                 // Controlla collisioni con piattaforme
@@ -940,7 +946,15 @@
                 const finalPosition = this.physicsManager.enforceGroundLimit(newPosition);
                 
                 // Aggiorna posizione del rig (non della camera singola)
-                cameraRig.position = finalPosition;
+                try {
+                    cameraRig.position = finalPosition;
+                } catch (error) {
+                    console.error("❌ Errore nell'aggiornamento posizione:", error);
+                    // Fallback: prova a muovere la camera normale
+                    if (this.activeCamera) {
+                        this.activeCamera.position = finalPosition;
+                    }
+                }
                 
                 // Aggiorna UI
                 const physicsState = this.physicsManager.getPhysicsState();
@@ -966,9 +980,10 @@
                 const app = new RocketFlightVR();
                 await app.initialize();
                 
-                // Configura il game manager con la camera
+                // Configura il game manager con la camera e XR
                 if (app.gameManager && app.scene) {
                     app.gameManager.setActiveCamera(app.scene.activeCamera);
+                    app.gameManager.setXRReference(app.xr);
                     
                     // Registra il loop di aggiornamento del gioco
                     app.scene.registerBeforeRender(() => {
