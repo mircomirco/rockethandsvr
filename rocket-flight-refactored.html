@@ -230,9 +230,6 @@
 
                 // Collega i manager tra loro
                 this.connectManagers();
-                
-                // Passa il riferimento XR al game manager
-                this.gameManager.setXRReference(this.xr);
 
                 console.log("✅ Tutti i manager inizializzati");
             }
@@ -838,9 +835,6 @@
                 // Riferimento alla camera attiva
                 this.activeCamera = null;
                 
-                // Riferimento al sistema XR
-                this.xr = null;
-                
                 console.log("🎯 Game Manager inizializzato");
             }
 
@@ -850,14 +844,6 @@
              */
             setActiveCamera(camera) {
                 this.activeCamera = camera;
-            }
-
-            /**
-             * Imposta il riferimento al sistema XR
-             * @param {Object} xr - Sistema XR
-             */
-            setXRReference(xr) {
-                this.xr = xr;
             }
 
             /**
@@ -911,18 +897,7 @@
                     return;
                 }
 
-                // Determina se siamo in VR e ottieni il rig corretto
-                const isInVR = this.xr && this.xr.baseExperience && this.xr.baseExperience.state === BABYLON.WebXRState.IN_XR;
-                let cameraRig;
-                
-                if (isInVR && this.xr.baseExperience.camera.parent) {
-                    // In VR: muovi il rig per mantenere il tracking posizionale
-                    cameraRig = this.xr.baseExperience.camera.parent;
-                } else {
-                    // Fuori VR: muovi la camera normale
-                    cameraRig = this.activeCamera;
-                }
-                const currentPosition = cameraRig.position;
+                const currentPosition = this.activeCamera.position;
                 
                 // Controlla collisioni con piattaforme
                 const landingPlatform = this.platformManager.checkPlatformLanding(currentPosition.y);
@@ -939,8 +914,8 @@
                 // Applica limite terreno
                 const finalPosition = this.physicsManager.enforceGroundLimit(newPosition);
                 
-                // Aggiorna posizione del rig (non della camera singola)
-                cameraRig.position = finalPosition;
+                // Aggiorna posizione camera
+                this.activeCamera.position = finalPosition;
                 
                 // Aggiorna UI
                 const physicsState = this.physicsManager.getPhysicsState();
