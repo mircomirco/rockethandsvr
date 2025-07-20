@@ -67,6 +67,16 @@
         <div id="position" class="info">Posizione: Y: 1.60</div>
         <div id="velocity" class="info">Velocità: 0.00</div>
         <div id="platform" class="info">Piattaforma: Nessuna</div>
+        <button id="enterVRBtn" style="
+            background: #667eea; 
+            color: white; 
+            border: none; 
+            padding: 10px 20px; 
+            border-radius: 8px; 
+            margin: 10px 0; 
+            cursor: pointer;
+            font-weight: bold;
+        ">Enter VR</button>
         <div class="instructions">
             <strong>Controlli Quest 3:</strong><br>
             • <strong>Tasto A:</strong> Attiva razzi (salita)<br>
@@ -79,10 +89,18 @@
     <script>
         // Funzione per verificare il supporto WebXR
         function checkWebXRSupport() {
+            console.log("Verifica supporto WebXR...");
+            console.log("navigator.xr disponibile:", !!navigator.xr);
+            console.log("User Agent:", navigator.userAgent);
+            
             if (navigator.xr) {
-                return navigator.xr.isSessionSupported('immersive-vr');
+                return navigator.xr.isSessionSupported('immersive-vr').then(supported => {
+                    console.log("WebXR immersive-vr supportato:", supported);
+                    return supported;
+                });
             }
-            return false;
+            console.log("navigator.xr non disponibile");
+            return Promise.resolve(false);
         }
 
         const canvas = document.getElementById("renderCanvas");
@@ -212,20 +230,56 @@
                 return null;
             }
 
-            // WebXR Experience
+            // WebXR Experience ottimizzata per Quest 3
             const xr = await scene.createDefaultXRExperienceAsync({
                 uiOptions: {
-                    sessionMode: "immersive-vr"
+                    sessionMode: "immersive-vr",
+                    referenceSpaceType: "local-floor"
                 },
-                optionalFeatures: ["hand-tracking", "layers"]
+                optionalFeatures: ["hand-tracking", "layers", "dom-overlay"],
+                requiredFeatures: ["local-floor"]
             });
 
             if (!xr.baseExperience) {
-                updateStatus("VR non supportato", "inactive");
+                updateStatus("VR non supportato - Verifica browser", "inactive");
+                console.error("WebXR non inizializzato");
                 return scene;
             }
 
-            updateStatus("VR attivo - Premi A per volare", "inactive");
+            // Configurazione specifica per Quest 3
+            xr.baseExperience.onStateChangedObservable.add((webXRState) => {
+                console.log("Stato WebXR:", webXRState);
+                switch (webXRState) {
+                    case BABYLON.WebXRState.ENTERING_XR:
+                        updateStatus("Entrando in VR...", "active");
+                        break;
+                    case BABYLON.WebXRState.IN_XR:
+                        updateStatus("VR ATTIVO - Premi A per volare", "active");
+                        break;
+                    case BABYLON.WebXRState.EXITING_XR:
+                        updateStatus("Uscendo da VR", "inactive");
+                        break;
+                    case BABYLON.WebXRState.NOT_IN_XR:
+                        updateStatus("Clicca 'Enter VR' per iniziare", "inactive");
+                        break;
+                }
+            });
+
+            updateStatus("Clicca 'Enter VR' per iniziare", "inactive");
+
+            // Gestione pulsante manuale Enter VR
+            const enterVRBtn = document.getElementById('enterVRBtn');
+            if (enterVRBtn) {
+                enterVRBtn.addEventListener('click', async () => {
+                    try {
+                        console.log("Tentativo di entrare in VR manualmente...");
+                        await xr.baseExperience.enterXRAsync("immersive-vr", "local-floor");
+                    } catch (error) {
+                        console.error("Errore nell'entrare in VR:", error);
+                        updateStatus("Errore VR: " + error.message, "inactive");
+                    }
+                });
+            }
 
             // Gestione controller
             xr.input.onControllerAddedObservable.add(controller => {
@@ -349,9 +403,10 @@
             return scene;
         };
 
-        // Inizializzazione
+        // Inizializzazione ottimizzata per Quest 3
         checkWebXRSupport().then(supported => {
             if (supported) {
+                console.log("WebXR supportato - Inizializzazione scena");
                 createScene().then(scene => {
                     engine.runRenderLoop(() => {
                         scene.render();
@@ -360,13 +415,27 @@
                     window.addEventListener("resize", function () {
                         engine.resize();
                     });
+                    
+                    // Debug per Quest 3
+                    console.log("Scena creata con successo");
+                    console.log("User Agent:", navigator.userAgent);
+                    
+                    // Verifica se siamo su Quest
+                    if (navigator.userAgent.includes('Quest') || navigator.userAgent.includes('Oculus')) {
+                        console.log("Dispositivo Quest rilevato - Applicando ottimizzazioni");
+                    }
+                    
                 }).catch(error => {
                     console.error("Errore nella creazione della scena:", error);
+                    document.getElementById('status').textContent = "Errore: " + error.message;
                 });
             } else {
-                console.error("WebXR non supportato");
-                document.body.innerHTML = "<h1>WebXR non supportato su questo dispositivo</h1>";
+                console.error("WebXR non supportato su questo dispositivo");
+                document.getElementById('status').textContent = "WebXR non supportato";
+                document.getElementById('status').className = "status inactive";
             }
+        }).catch(error => {
+            console.error("Errore nel controllo WebXR:", error);
         });
     </script>
 </body>
